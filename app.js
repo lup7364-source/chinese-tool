@@ -2,13 +2,18 @@
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let days = [];
-let index = 0;
+let index = 0;        // current word
+let step = 0;         // current section of the word
 let correctCount = 0;
 let parsed = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/"/g, "&quot;");
 const hasZh = s => /[\u4e00-\u9fff]/.test(s);
+const isChoice = q => q.options && q.options.length > 0;
+
+const SPK = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+const speakBtn = t => `<button class="speak" data-say="${esc(t)}" aria-label="發音">${SPK}</button>`;
 
 /* ---------- Load words ---------- */
 async function loadDays() {
@@ -32,7 +37,6 @@ async function loadDays() {
   }));
 }
 
-/* ---------- Audio ---------- */
 function speak(text) {
   speechSynthesis.cancel();
   const voice = new SpeechSynthesisUtterance(text);
@@ -40,36 +44,25 @@ function speak(text) {
   speechSynthesis.speak(voice);
 }
 
-/* ---------- Lesson display ---------- */
-function line(item) {
-  return `
-    <div class="item">
-      <div class="zh">${item.zh} <button data-say="${esc(item.zh)}">🔊</button></div>
-      ${item.pinyin ? `<div class="pinyin">${item.pinyin}</div>` : ""}
-      <div>${item.en || ""}</div>
-    </div>`;
-}
+/* ---------- Section builders ---------- */
+const item = it => `
+  <div class="item">
+    <div class="row"><div class="zh">${it.zh}</div>${speakBtn(it.zh)}</div>
+    ${it.pinyin ? `<div class="py">${it.pinyin}</div>` : ""}
+    ${it.en ? `<div>${it.en}</div>` : ""}
+  </div>`;
 
-function listCard(title, items) {
-  if (!items || items.length === 0) return "";
-  return `<div class="card"><h2>${title}</h2>${items.map(line).join("")}</div>`;
-}
-
-function textCard(t) {
+function textBody(t) {
   if (!t || !t.zh) return "";
   return `
-    <div class="card">
-      <h2>Daily text</h2>
-      <div class="zh">${t.zh} <button data-say="${esc(t.zh)}">🔊</button></div>
-      <p class="pinyin">${t.pinyin || ""}</p>
-      <p>${t.en || ""}</p>
+    <div class="item">
+      <div class="row"><div class="zh">${t.zh}</div>${speakBtn(t.zh)}</div>
+      <div class="py">${t.pinyin || ""}</div>
+      <div>${t.en || ""}</div>
     </div>`;
 }
 
-const isChoice = q => q.options && q.options.length > 0;
-
-function practiceHTML(d) {
-  if (!d.questions || d.questions.length === 0) return "";
+function practiceBody(d) {
   const qs = d.questions.map((q, qi) => isChoice(q)
     ? `<div class="question" id="q${qi}">
          <p><strong>${qi + 1}. ${q.question}</strong></p>
@@ -78,34 +71,88 @@ function practiceHTML(d) {
          <p class="feedback" id="fb${qi}"></p>
        </div>`
     : `<div class="question">
-         <p><strong>${qi + 1}. ${q.question}</strong> <button data-say="${esc(q.question)}">🔊</button></p>
-         ${q.question_en ? `<p class="pinyin">${q.question_en}</p>` : ""}
-         <textarea rows="3" placeholder="Write your answer in Chinese..."></textarea>
+         <div class="row"><p><strong>${qi + 1}. ${q.question}</strong></p>${speakBtn(q.question)}</div>
+         ${q.question_en ? `<p class="py">${q.question_en}</p>` : ""}
+         <textarea rows="3" placeholder="寫下你的答案…"></textarea>
        </div>`).join("");
-  const hasChoice = d.questions.some(isChoice);
-  return `<div class="card"><h2>Practice</h2>${qs}${hasChoice ? '<p id="score"></p>' : ""}</div>`;
+  return qs + (d.questions.some(isChoice) ? '<p id="score"></p>' : "");
 }
 
-function show() {
-  const d = days[index];
-  correctCount = 0;
-  $("dayLabel").textContent = `Day ${index + 1} of ${days.length} · ${d.code}`;
-  $("prev").disabled = index === 0;
-  $("next").disabled = index === days.length - 1;
+function summaryQuestions(d) {
+  return d.questions.map((q, i) => isChoice(q)
+    ? `<p><strong>${i + 1}. ${q.question}</strong><br>答案：${q.answer}</p>`
+    : `<p><strong>${i + 1}. ${q.question}</strong><br><span class="py">${q.question_en || ""}</span></p>`
+  ).join("");
+}
 
-  $("lesson").innerHTML = `
-    <div class="card center">
-      <div class="big">${d.character}</div>
-      <div class="pinyin" style="font-size:24px">${d.pinyin}</div>
-      <div><strong>${d.meaning}</strong></div>
-      <button data-say="${esc(d.pronunciation)}">🔊 Listen</button>
+function summaryHTML(d) {
+  const block = (t, html) => html ? `<section class="blk"><h3>${t}</h3>${html}</section>` : "";
+  return `
+    <h2>總結</h2>
+    <div class="hero small">
+      <div class="hanzi">${d.character}</div>
+      <div class="py big">${d.pinyin}</div>
+      ${speakBtn(d.pronunciation)}
     </div>
-    ${d.usage ? `<div class="card"><h2>How to use it</h2><p>${d.usage}</p></div>` : ""}
-    ${listCard("Examples", d.examples)}
-    ${listCard("Common expressions", d.expressions)}
-    ${textCard(d.text)}
-    ${practiceHTML(d)}
-  `;
+    ${block("意思", `<p class="body">${d.meaning}</p>`)}
+    ${block("用法", d.usage && `<p class="body">${d.usage}</p>`)}
+    ${block("例句", d.examples.map(item).join(""))}
+    ${block("常用表達", d.expressions.map(item).join(""))}
+    ${block("短文", textBody(d.text))}
+    ${block("練習題", summaryQuestions(d))}`;
+}
+
+function stepsFor(d) {
+  const s = [{ id: "word", title: "單字" }];
+  if (d.usage) s.push({ id: "usage", title: "用法" });
+  if (d.examples.length) s.push({ id: "examples", title: "例句" });
+  if (d.expressions.length) s.push({ id: "expressions", title: "常用表達" });
+  if (d.text && d.text.zh) s.push({ id: "text", title: "短文" });
+  if (d.questions.length) s.push({ id: "practice", title: "練習題" });
+  s.push({ id: "summary", title: "總結" });
+  return s;
+}
+
+function sectionHTML(id, d, title) {
+  switch (id) {
+    case "word":
+      return `<h2>${title}</h2>
+        <div class="hero">
+          <div class="hanzi">${d.character}</div>
+          <div class="py big">${d.pinyin}</div>
+          <div class="listen">${speakBtn(d.pronunciation)}<span>發音</span></div>
+        </div>
+        <div class="note"><small>意思</small><p>${d.meaning}</p></div>`;
+    case "usage":       return `<h2>${title}</h2><p class="body">${d.usage}</p>`;
+    case "examples":    return `<h2>${title}</h2>${d.examples.map(item).join("")}`;
+    case "expressions": return `<h2>${title}</h2>${d.expressions.map(item).join("")}`;
+    case "text":        return `<h2>${title}</h2>${textBody(d.text)}`;
+    case "practice":    return `<h2>${title}</h2>${practiceBody(d)}`;
+    default:            return summaryHTML(d);
+  }
+}
+
+/* ---------- Render ---------- */
+function render() {
+  const d = days[index];
+  const steps = stepsFor(d);
+  step = Math.min(step, steps.length - 1);
+  correctCount = 0;
+
+  $("wordLabel").textContent = `第 ${index + 1} / ${days.length} 個 · ${d.code}`;
+  $("prevWord").disabled = index === 0;
+  $("nextWord").disabled = index === days.length - 1;
+
+  $("tabs").innerHTML = steps.map((s, i) =>
+    `<button class="tab ${i === step ? "active" : ""}" data-step="${i}">${s.title}</button>`).join("");
+  $("stage").innerHTML = sectionHTML(steps[step].id, d, steps[step].title);
+
+  const last = step === steps.length - 1;
+  const hasMoreWords = index < days.length - 1;
+  $("prevStep").disabled = step === 0;
+  $("nextStep").textContent = !last ? "下一步" : hasMoreWords ? "下一個單字" : "完成";
+  $("nextStep").disabled = last && !hasMoreWords;
+
   window.scrollTo(0, 0);
   localStorage.setItem("lastDay", index);
 }
@@ -125,33 +172,43 @@ function checkAnswer(btn) {
       if (q.options[Number(b.dataset.o)] === q.answer) b.classList.add("right");
     });
   }
-  $("fb" + qi).textContent = (correct ? "✅ Correct! " : "❌ Not quite. ") + (q.explanation || "");
+  $("fb" + qi).textContent = (correct ? "答對了！ " : "再試試。 ") + (q.explanation || "");
   if (correct) correctCount++;
-  const total = days[index].questions.filter(isChoice).length;
-  $("score").textContent = `Score: ${correctCount} / ${total}`;
+  $("score").textContent = `得分：${correctCount} / ${days[index].questions.filter(isChoice).length}`;
 }
 
-document.addEventListener("click", (e) => {
-  const say = e.target.dataset.say;
-  if (say) { speak(say); return; }
-  if (e.target.classList.contains("option")) checkAnswer(e.target);
+/* ---------- Events ---------- */
+document.addEventListener("click", e => {
+  const say = e.target.closest("[data-say]");
+  if (say) { speak(say.dataset.say); return; }
+  const opt = e.target.closest(".option");
+  if (opt) { checkAnswer(opt); return; }
+  const tab = e.target.closest("[data-step]");
+  if (tab) { step = Number(tab.dataset.step); render(); }
 });
-$("prev").onclick = () => { index--; show(); };
-$("next").onclick = () => { index++; show(); };
+
+$("nextStep").onclick = () => {
+  if (step < stepsFor(days[index]).length - 1) step++;
+  else if (index < days.length - 1) { index++; step = 0; }
+  render();
+};
+$("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
+$("prevWord").onclick = () => { index--; step = 0; render(); };
+$("nextWord").onclick = () => { index++; step = 0; render(); };
 
 /* ---------- Text parser (pasted block -> word object) ---------- */
 const HEADERS = {
-  character: /^character$/i,
-  pinyin: /^pinyin$/i,
-  pronunciation: /^pronunciation$/i,
-  meaning: /^meaning$/i,
-  usage: /^usage$/i,
-  examples: /^examples?$/i,
-  expressions: /^(common )?expressions?( related)?$/i,
-  questions: /^questions?( to practice)?$/i
+  character: /^(character|單字|漢字)$/i,
+  pinyin: /^(pinyin|拼音)$/i,
+  pronunciation: /^(pronunciation|發音)$/i,
+  meaning: /^(meaning|意思)$/i,
+  usage: /^(usage|用法)$/i,
+  examples: /^(examples?|例句)$/i,
+  expressions: /^((common )?expressions?( related)?|常用表達)$/i,
+  questions: /^(questions?( to practice)?|練習題?)$/i
 };
 
-// Chinese line starts a new item; following non-Chinese lines are its English
+// A Chinese line starts a new item; the non-Chinese lines after it are its English
 function pairLines(lines) {
   const out = [];
   lines.filter(Boolean).forEach(l => {
@@ -196,9 +253,9 @@ function parseWord(raw) {
     expressions: (sec.expressions || []).filter(Boolean).map(parseExpression),
     questions: pairLines(sec.questions || []).map(p => ({ question: p.zh, question_en: p.en }))
   };
-  if (!w.character) throw new Error("Missing the Character section.");
-  if (!w.pinyin) throw new Error("Missing the Pinyin section.");
-  if (!w.meaning) throw new Error("Missing the Meaning section.");
+  if (!w.character) throw new Error("缺少 Character（單字）區塊。");
+  if (!w.pinyin) throw new Error("缺少 Pinyin（拼音）區塊。");
+  if (!w.meaning) throw new Error("缺少 Meaning（意思）區塊。");
   return w;
 }
 
@@ -207,15 +264,15 @@ function previewHTML(w) {
     <p><strong>${w.character}</strong> · ${w.pinyin}</p>
     <p><em>${w.meaning}</em></p>
     <p>${w.usage}</p>
-    <p><strong>Examples (${w.examples.length})</strong></p>
+    <p><strong>例句（${w.examples.length}）</strong></p>
     <ul>${w.examples.map(e => `<li>${e.zh} → ${e.en}</li>`).join("")}</ul>
-    <p><strong>Expressions (${w.expressions.length})</strong></p>
-    <ul>${w.expressions.map(e => `<li>${e.zh}${e.pinyin ? " (" + e.pinyin + ")" : ""} → ${e.en}</li>`).join("")}</ul>
-    <p><strong>Questions (${w.questions.length})</strong></p>
+    <p><strong>常用表達（${w.expressions.length}）</strong></p>
+    <ul>${w.expressions.map(e => `<li>${e.zh}${e.pinyin ? "（" + e.pinyin + "）" : ""} → ${e.en}</li>`).join("")}</ul>
+    <p><strong>練習題（${w.questions.length}）</strong></p>
     <ul>${w.questions.map(q => `<li>${q.question} → ${q.question_en}</li>`).join("")}</ul>`;
 }
 
-/* ---------- Admin ---------- */
+/* ---------- Admin (add words) ---------- */
 async function initAdmin() {
   const on = location.hash === "#admin";
   $("admin").hidden = !on;
@@ -231,7 +288,7 @@ $("loginBtn").onclick = async () => {
     email: $("email").value.trim(),
     password: $("password").value
   });
-  if (error) { alert("Login failed: " + error.message); return; }
+  if (error) { alert("登入失敗：" + error.message); return; }
   $("password").value = "";
   initAdmin();
 };
@@ -259,32 +316,33 @@ $("saveBtn").onclick = async () => {
   $("saveBtn").disabled = false;
   if (error) {
     $("adminStatus").textContent = /duplicate key/i.test(error.message)
-      ? "❌ This word already exists in the database."
+      ? "❌ 這個單字已經在資料庫裡了。"
       : "❌ " + error.message;
     return;
   }
-  $("adminStatus").textContent = "✅ Saved as " + data;
+  $("adminStatus").textContent = "✅ 已儲存，編號 " + data;
   $("raw").value = "";
   $("preview").innerHTML = "";
   $("saveBtn").hidden = true;
   parsed = null;
   days = await loadDays();
   index = Math.max(0, days.findIndex(d => d.code === data));
-  show();
+  step = 0;
+  render();
 };
 
 /* ---------- Start ---------- */
 loadDays()
   .then(data => {
     if (data.length === 0) {
-      $("lesson").textContent = "No words in the database yet.";
+      $("stage").textContent = "資料庫裡還沒有單字。";
       return;
     }
     days = data;
     index = Math.min(Number(localStorage.getItem("lastDay")) || 0, days.length - 1);
-    show();
+    render();
   })
   .catch(err => {
-    $("lesson").textContent = "Could not load words: " + err.message;
+    $("stage").textContent = "無法載入單字：" + err.message;
   })
   .finally(initAdmin);

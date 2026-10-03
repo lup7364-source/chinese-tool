@@ -1,3 +1,5 @@
+[hidden] { display: none !important; }
+
 body {
   font-family: sans-serif;
   max-width: 600px;
@@ -24,6 +26,7 @@ button {
   color: white;
 }
 button:disabled { background: #bbb; }
+button.secondary { background: #777; }
 
 .card {
   background: white;
@@ -40,7 +43,7 @@ button:disabled { background: #bbb; }
 .item { margin-bottom: 12px; }
 .zh { font-size: 22px; }
 
-/* Practice questions */
+/* Practice */
 .question { margin-bottom: 18px; }
 .option {
   display: block;
@@ -53,3 +56,20 @@ button:disabled { background: #bbb; }
 .option.right { background: #2e8b57; color: white; }
 .option.wrong { background: #c0392b; color: white; }
 .feedback { font-size: 14px; color: #444; }
+
+/* Forms (open questions and admin) */
+textarea, input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 8px;
+  margin: 6px 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-family: inherit;
+}
+#preview { margin: 12px 0; font-size: 14px; }
+#preview ul { padding-left: 18px; }
+#adminStatus { font-size: 14px; }
+footer { text-align: center; margin: 24px 0; font-size: 13px; }
+footer a { color: #999; }

@@ -17,6 +17,28 @@
 
   <div id="lesson">Loading...</div>
 
+  <!-- Admin area: only visible at the address ending in #admin -->
+  <div id="admin" hidden>
+    <div class="card" id="loginBox">
+      <h2>Admin login</h2>
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Password">
+      <button id="loginBtn">Log in</button>
+    </div>
+
+    <div class="card" id="addBox" hidden>
+      <h2>Add a word</h2>
+      <textarea id="raw" rows="14" placeholder="Paste the word here (Character, Pinyin, Meaning, Usage, Example, Common expressions related, Questions to practice)"></textarea>
+      <button id="analyzeBtn">Analyze</button>
+      <div id="preview"></div>
+      <button id="saveBtn" hidden>Save to database</button>
+      <button id="logoutBtn" class="secondary">Log out</button>
+      <p id="adminStatus"></p>
+    </div>
+  </div>
+
+  <footer><a href="#admin">Admin</a></footer>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
