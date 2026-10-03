@@ -1,17 +1,55 @@
 body {
   font-family: sans-serif;
-  text-align: center;
-  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+  background: #f7f5f0;
+  color: #222;
 }
-#character {
-  font-size: 100px;
+h1 { text-align: center; }
+
+#nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
 }
-#pinyin {
-  font-size: 28px;
-  color: gray;
-}
+
 button {
-  font-size: 20px;
-  padding: 10px 20px;
-  margin-top: 15px;
+  font-size: 16px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #c0392b;
+  color: white;
 }
+button:disabled { background: #bbb; }
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.card h2 { margin-top: 0; font-size: 18px; color: #c0392b; }
+
+.big { font-size: 90px; text-align: center; }
+.center { text-align: center; }
+.pinyin { color: #777; }
+.item { margin-bottom: 12px; }
+.zh { font-size: 22px; }
+
+/* Practice questions */
+.question { margin-bottom: 18px; }
+.option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 6px 0;
+  background: #eee;
+  color: #222;
+}
+.option.right { background: #2e8b57; color: white; }
+.option.wrong { background: #c0392b; color: white; }
+.feedback { font-size: 14px; color: #444; }

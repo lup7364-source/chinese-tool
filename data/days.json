@@ -3,5 +3,302 @@
     "day": 1,
     "character": "學",
     "pinyin": "xué"
+  },
+  {
+    "character": "聊天室",
+    "pinyin": "liáo tiān shì",
+    "meaning": "chat room",
+    "usage": "\"聊天室\" refers to an online chat room or virtual room where people send text messages and talk to each other. It is often used when talking about online forums, social apps, gaming, or language learning platforms.",
+    "examples": [
+      {
+        "zh": "我們在網上的聊天室練習中文。",
+        "pinyin": "Wǒmen zài wǎngshàng de liáotiānshì liànxí Zhōngwén.",
+        "en": "We practice Chinese in an online chat room."
+      },
+      {
+        "zh": "請進這個聊天室，大家都在這裡。",
+        "pinyin": "Qǐng jìn zhège liáotiānshì, dàjiā dōu zài zhèlǐ.",
+        "en": "Please enter this chat room; everyone is here."
+      },
+      {
+        "zh": "這個聊天室裡有很多新朋友。",
+        "pinyin": "Zhège liáotiānshì lǐ yǒu hěn duō xīn péngyǒu.",
+        "en": "There are many new friends in this chat room."
+      }
+    ],
+    "expressions": [
+      {
+        "zh": "線上聊天室",
+        "pinyin": "xiànshàng liáotiānshì",
+        "en": "online chat room"
+      },
+      {
+        "zh": "進入聊天室",
+        "pinyin": "jìnrù liáotiānshì",
+        "en": "to enter a chat room"
+      },
+      {
+        "zh": "語言聊天室",
+        "pinyin": "yǔyán liáotiānshì",
+        "en": "language exchange chat room"
+      }
+    ],
+    "text": {
+      "zh": "我每天晚上都會上網。我和世界各地的朋友在一個聊天室裡聊天。我們互相學習語言，分享每天的生活。在聊天室裡學習中文真的很有趣！",
+      "pinyin": "Wǒ měitiān wǎnshang dōu huì shàngwǎng. Wǒ hé shìjiè gèdì de péngyǒu zài yí gè liáotiānshì lǐ liáotiān. Wǒmen hùxiāng xuéxí yǔyán, fēnxiǎng měitiān de shēnghuó. Zài liáotiānshì lǐ xuéxí Zhōngwén zhēn de hěn yǒuqù!",
+      "en": "I go online every evening. I chat with friends from all over the world in a chat room. We learn languages from each other and share our daily lives. Learning Chinese in a chat room is really interesting!"
+    },
+    "questions": [
+      {
+        "question": "「聊天室」的英文意思是什麼？",
+        "options": [
+          "Chat room",
+          "Bedroom",
+          "Classroom",
+          "Kitchen"
+        ],
+        "answer": "Chat room",
+        "explanation": "「聊天」means to chat, and「室」means room, so「聊天室」means chat room."
+      },
+      {
+        "question": "請選出正確的搭配：請______這個聊天室，我們開始開會了。",
+        "options": [
+          "進入",
+          "吃",
+          "買",
+          "洗"
+        ],
+        "answer": "進入",
+        "explanation": "「進入聊天室」is the standard collocation meaning 'to enter a chat room'."
+      },
+      {
+        "question": "根據課文，作者在聊天室裡做什麼？",
+        "options": [
+          "買東西",
+          "學習語言和聊天",
+          "看電影",
+          "做飯"
+        ],
+        "answer": "學習語言和聊天",
+        "explanation": "The text states that the author chats with friends and learns languages from each other in the chat room (在一個聊天室裡聊天。我們互相學習語言)."
+      },
+      {
+  "day": 3,
+  "character": "聊天室",
+  "pinyin": "liáotiānshì",
+  "meaning": "chat room",
+  "usage": "An online space where people type messages to each other in real time. 聊天 means to chat and 室 means room.",
+  "examples": [
+    { "zh": "我常常在聊天室認識新朋友。", "pinyin": "Wǒ chángcháng zài liáotiānshì rènshi xīn péngyǒu.", "en": "I often meet new friends in chat rooms." },
+    { "zh": "這個聊天室有很多人。", "pinyin": "Zhège liáotiānshì yǒu hěn duō rén.", "en": "This chat room has a lot of people." },
+    { "zh": "晚上他在聊天室跟同學討論功課。", "pinyin": "Wǎnshàng tā zài liáotiānshì gēn tóngxué tǎolùn gōngkè.", "en": "At night he discusses homework with classmates in the chat room." }
+  ],
+  "expressions": [
+    { "zh": "聊天", "pinyin": "liáotiān", "en": "to chat" },
+    { "zh": "網路聊天室", "pinyin": "wǎnglù liáotiānshì", "en": "online chat room" },
+    { "zh": "進入聊天室", "pinyin": "jìnrù liáotiānshì", "en": "to enter a chat room" }
+  ],
+  "text": {
+    "zh": "小美下班後喜歡上網。她今天進入一個聊天室，認識了一位住在台南的朋友。他們聊了一個小時，聊電影、聊美食，也聊工作。小美覺得聊天室很有意思。",
+    "pinyin": "Xiǎoměi xiàbān hòu xǐhuān shàngwǎng. Tā jīntiān jìnrù yí ge liáotiānshì, rènshi le yí wèi zhù zài Táinán de péngyǒu. Tāmen liáo le yí ge xiǎoshí, liáo diànyǐng, liáo měishí, yě liáo gōngzuò. Xiǎoměi juéde liáotiānshì hěn yǒuyìsi.",
+    "en": "After work, Xiaomei likes to go online. Today she entered a chat room and met a friend who lives in Tainan. They chatted for an hour about movies, food, and work. Xiaomei thinks chat rooms are interesting."
+  },
+  "questions": [
+    { "question": "What does 聊天室 mean?", "options": ["chat room", "movie theater", "classroom", "office"], "answer": "chat room", "explanation": "聊天 = to chat, 室 = room, so 聊天室 is a chat room." },
+    { "question": "我常常在＿＿認識新朋友。", "options": ["聊天室", "電影院", "部門", "公司"], "answer": "聊天室", "explanation": "You meet new friends online in a 聊天室." },
+    { "question": "Which word means 'to chat'?", "options": ["聊天", "加班", "上癮", "刺激"], "answer": "聊天", "explanation": "聊天 (liáotiān) means to chat." }
+  ]
+},
+{
+  "day": 4,
+  "character": "上班族",
+  "pinyin": "shàngbānzú",
+  "meaning": "office worker, salaried worker",
+  "usage": "People who go to a regular job and commute to work. 上班 means to go to work and 族 means a group of people.",
+  "examples": [
+    { "zh": "他是一個上班族。", "pinyin": "Tā shì yí ge shàngbānzú.", "en": "He is an office worker." },
+    { "zh": "早上的捷運上都是上班族。", "pinyin": "Zǎoshang de jiéyùn shàng dōu shì shàngbānzú.", "en": "The MRT is full of office workers in the morning." },
+    { "zh": "很多上班族中午吃便當。", "pinyin": "Hěn duō shàngbānzú zhōngwǔ chī biàndāng.", "en": "Many office workers eat boxed lunches at noon." }
+  ],
+  "expressions": [
+    { "zh": "上班", "pinyin": "shàngbān", "en": "to go to work" },
+    { "zh": "下班", "pinyin": "xiàbān", "en": "to get off work" },
+    { "zh": "月光族", "pinyin": "yuèguāngzú", "en": "people who spend all their pay every month" }
+  ],
+  "text": {
+    "zh": "王先生是一個上班族。他每天早上七點起床，搭捷運去公司。中午他和同事一起吃飯，晚上六點下班。週末他喜歡在家休息。",
+    "pinyin": "Wáng xiānsheng shì yí ge shàngbānzú. Tā měitiān zǎoshang qī diǎn qǐchuáng, dā jiéyùn qù gōngsī. Zhōngwǔ tā hé tóngshì yìqǐ chīfàn, wǎnshàng liù diǎn xiàbān. Zhōumò tā xǐhuān zài jiā xiūxí.",
+    "en": "Mr. Wang is an office worker. Every day he gets up at seven and takes the MRT to the company. At noon he eats with his colleagues, and he gets off work at six. On weekends he likes to rest at home."
+  },
+  "questions": [
+    { "question": "What does 上班族 mean?", "options": ["office worker", "student", "movie star", "business owner"], "answer": "office worker", "explanation": "上班 = go to work, 族 = group, so 上班族 are people with regular jobs." },
+    { "question": "早上的捷運上有很多＿＿。", "options": ["上班族", "電影院", "聊天室", "恐怖片"], "answer": "上班族", "explanation": "Office workers commute on the MRT in the morning." },
+    { "question": "What does 下班 mean?", "options": ["to get off work", "to go to work", "to work overtime", "to take a vacation"], "answer": "to get off work", "explanation": "下 = down/finish, 班 = work shift, so 下班 is to get off work." }
+  ]
+},
+{
+  "day": 5,
+  "character": "血拼",
+  "pinyin": "xuèpīn",
+  "meaning": "to go on a shopping spree",
+  "usage": "Casual slang for shopping a lot and spending freely, especially during sales. 拼 gives the feeling of going all out. Use it with friends, not in formal writing.",
+  "examples": [
+    { "zh": "週末我們去百貨公司血拼。", "pinyin": "Zhōumò wǒmen qù bǎihuò gōngsī xuèpīn.", "en": "This weekend we are going to the department store for a shopping spree." },
+    { "zh": "她每次打折都去血拼。", "pinyin": "Tā měi cì dǎzhé dōu qù xuèpīn.", "en": "She goes on a shopping spree every time there is a sale." },
+    { "zh": "昨天血拼完，我的錢包空了。", "pinyin": "Zuótiān xuèpīn wán, wǒ de qiánbāo kōng le.", "en": "After yesterday's shopping spree, my wallet is empty." }
+  ],
+  "expressions": [
+    { "zh": "週年慶", "pinyin": "zhōuniánqìng", "en": "anniversary sale (department stores)" },
+    { "zh": "打折", "pinyin": "dǎzhé", "en": "to give a discount, on sale" },
+    { "zh": "買東西", "pinyin": "mǎi dōngxi", "en": "to buy things, to shop" }
+  ],
+  "text": {
+    "zh": "百貨公司週年慶開始了。小玲和朋友一大早就去血拼。她們買了衣服、鞋子，還有一個新包包。回家以後，小玲看看錢包，笑著說：「這個月不能再血拼了！」",
+    "pinyin": "Bǎihuò gōngsī zhōuniánqìng kāishǐ le. Xiǎolíng hé péngyǒu yí dà zǎo jiù qù xuèpīn. Tāmen mǎi le yīfu, xiézi, hái yǒu yí ge xīn bāobāo. Huí jiā yǐhòu, Xiǎolíng kànkan qiánbāo, xiàozhe shuō: “Zhège yuè bù néng zài xuèpīn le!”",
+    "en": "The department store's anniversary sale has started. Xiaoling and her friends went shopping first thing in the morning. They bought clothes, shoes, and a new bag. After getting home, Xiaoling looked at her wallet and said with a laugh, “I can't go on another shopping spree this month!”"
+  },
+  "questions": [
+    { "question": "What does 血拼 mean?", "options": ["to go on a shopping spree", "to exercise hard", "to cook dinner", "to work overtime"], "answer": "to go on a shopping spree", "explanation": "血拼 is slang for shopping a lot and spending freely." },
+    { "question": "百貨公司打折，我們去＿＿吧！", "options": ["血拼", "加班", "哭", "嚇"], "answer": "血拼", "explanation": "When there is a sale, you go on a shopping spree (血拼)." },
+    { "question": "How would you describe 血拼?", "options": ["casual slang", "very formal", "only used in books", "only used for food"], "answer": "casual slang", "explanation": "血拼 is informal. Use it with friends." }
+  ]
+},
+{
+  "day": 6,
+  "character": "冷清",
+  "pinyin": "lěngqīng",
+  "meaning": "deserted, quiet and empty (with few people)",
+  "usage": "Describes a place or business that has few people, so it feels empty or slow. The opposite is 熱鬧 (rènào), lively.",
+  "examples": [
+    { "zh": "下雨天，夜市很冷清。", "pinyin": "Xià yǔ tiān, yèshì hěn lěngqīng.", "en": "On rainy days the night market is deserted." },
+    { "zh": "這家店的生意很冷清。", "pinyin": "Zhè jiā diàn de shēngyì hěn lěngqīng.", "en": "This shop's business is slow." },
+    { "zh": "過年的時候，城市變得很冷清。", "pinyin": "Guònián de shíhou, chéngshì biàn de hěn lěngqīng.", "en": "During Lunar New Year, the city becomes quiet and empty." }
+  ],
+  "expressions": [
+    { "zh": "生意冷清", "pinyin": "shēngyì lěngqīng", "en": "business is slow" },
+    { "zh": "冷冷清清", "pinyin": "lěnglěng qīngqīng", "en": "deserted and lonely" },
+    { "zh": "熱鬧", "pinyin": "rènào", "en": "lively, bustling (the opposite)" }
+  ],
+  "text": {
+    "zh": "星期一的晚上，夜市很冷清。路上沒有很多人，老闆們坐著等客人。到了星期六，這裡就非常熱鬧了。",
+    "pinyin": "Xīngqīyī de wǎnshàng, yèshì hěn lěngqīng. Lùshang méiyǒu hěn duō rén, lǎobǎnmen zuòzhe děng kèrén. Dào le xīngqīliù, zhèlǐ jiù fēicháng rènào le.",
+    "en": "On Monday night the night market is very quiet. There are not many people on the road, and the owners sit waiting for customers. By Saturday it is very lively here."
+  },
+  "questions": [
+    { "question": "What does 冷清 mean?", "options": ["deserted, with few people", "very cold", "very cheap", "very delicious"], "answer": "deserted, with few people", "explanation": "冷清 describes a place that feels empty because there are few people." },
+    { "question": "What is the opposite of 冷清?", "options": ["熱鬧", "便宜", "乾淨", "方便"], "answer": "熱鬧", "explanation": "熱鬧 (rènào) means lively and bustling." },
+    { "question": "下大雨，夜市變得很＿＿。", "options": ["冷清", "刺激", "厲害", "加班"], "answer": "冷清", "explanation": "With heavy rain, few people come, so the market is 冷清." }
+  ]
+},
+{
+  "day": 7,
+  "character": "高就",
+  "pinyin": "gāojiù",
+  "meaning": "(polite) to hold a good position, used to ask where someone works",
+  "usage": "A polite word for someone else's job. Say 請問您在哪裡高就？ to politely ask where a person works. Do not use it to talk about your own job.",
+  "examples": [
+    { "zh": "請問您在哪裡高就？", "pinyin": "Qǐngwèn nín zài nǎlǐ gāojiù?", "en": "May I ask where you work? (polite)" },
+    { "zh": "王先生現在在大公司高就。", "pinyin": "Wáng xiānsheng xiànzài zài dà gōngsī gāojiù.", "en": "Mr. Wang now holds a good position at a big company. (polite)" },
+    { "zh": "聽說你在科技公司高就，恭喜！", "pinyin": "Tīngshuō nǐ zài kējì gōngsī gāojiù, gōngxǐ!", "en": "I heard you have a good job at a tech company, congratulations!" }
+  ],
+  "expressions": [
+    { "zh": "在哪裡高就", "pinyin": "zài nǎlǐ gāojiù", "en": "where do you work (polite)" },
+    { "zh": "請問", "pinyin": "qǐngwèn", "en": "may I ask, excuse me" },
+    { "zh": "恭喜", "pinyin": "gōngxǐ", "en": "congratulations" }
+  ],
+  "text": {
+    "zh": "在朋友的婚禮上，林太太遇到一位新朋友。她笑著問：「請問您在哪裡高就？」那位先生說：「我在一家建設公司工作。」林太太說：「真厲害！」",
+    "pinyin": "Zài péngyǒu de hūnlǐ shàng, Lín tàitai yùdào yí wèi xīn péngyǒu. Tā xiàozhe wèn: “Qǐngwèn nín zài nǎlǐ gāojiù?” Nà wèi xiānsheng shuō: “Wǒ zài yì jiā jiànshè gōngsī gōngzuò.” Lín tàitai shuō: “Zhēn lìhài!”",
+    "en": "At a friend's wedding, Mrs. Lin met a new acquaintance. She asked with a smile, “May I ask where you work?” The man said, “I work at a construction company.” Mrs. Lin said, “How impressive!”"
+  },
+  "questions": [
+    { "question": "What does 高就 mean?", "options": ["(polite) where someone works", "to be tall", "to climb a mountain", "to go to school"], "answer": "(polite) where someone works", "explanation": "高就 is a polite word used about another person's job." },
+    { "question": "Which sentence politely asks about someone's job?", "options": ["請問您在哪裡高就？", "我在哪裡高就？", "我高就很好。", "你高就吃飯嗎？"], "answer": "請問您在哪裡高就？", "explanation": "請問您在哪裡高就？ is the standard polite question." },
+    { "question": "Can you use 高就 to talk about your own job?", "options": ["No, it is for other people's jobs", "Yes, always", "Only in writing", "Only for students"], "answer": "No, it is for other people's jobs", "explanation": "高就 is respectful, so it is used for the other person." }
+  ]
+},
+{
+  "day": 8,
+  "character": "部門",
+  "pinyin": "bùmén",
+  "meaning": "department, division",
+  "usage": "A section of a company or organization, such as human resources or sales. Often used with 工作 (to work) and 經理 (manager).",
+  "examples": [
+    { "zh": "你在哪個部門工作？", "pinyin": "Nǐ zài nǎge bùmén gōngzuò?", "en": "Which department do you work in?" },
+    { "zh": "我們部門有十個人。", "pinyin": "Wǒmen bùmén yǒu shí ge rén.", "en": "Our department has ten people." },
+    { "zh": "業務部門今天開會。", "pinyin": "Yèwù bùmén jīntiān kāihuì.", "en": "The sales department has a meeting today." }
+  ],
+  "expressions": [
+    { "zh": "人事部門", "pinyin": "rénshì bùmén", "en": "human resources department" },
+    { "zh": "業務部門", "pinyin": "yèwù bùmén", "en": "sales / business department" },
+    { "zh": "部門經理", "pinyin": "bùmén jīnglǐ", "en": "department manager" }
+  ],
+  "text": {
+    "zh": "小陳在一家公司的行銷部門工作。他們部門有八個人，每個星期一早上開會。經理常常說，一個好的部門要有好的合作。",
+    "pinyin": "Xiǎo Chén zài yì jiā gōngsī de xíngxiāo bùmén gōngzuò. Tāmen bùmén yǒu bā ge rén, měi ge xīngqīyī zǎoshang kāihuì. Jīnglǐ chángcháng shuō, yí ge hǎo de bùmén yào yǒu hǎo de hézuò.",
+    "en": "Xiao Chen works in the marketing department of a company. His department has eight people and holds a meeting every Monday morning. The manager often says that a good department needs good teamwork."
+  },
+  "questions": [
+    { "question": "What does 部門 mean?", "options": ["department", "movie", "door", "school"], "answer": "department", "explanation": "部門 is a department of a company or organization." },
+    { "question": "我在人事＿＿工作。", "options": ["部門", "聊天室", "電影院", "限制級"], "answer": "部門", "explanation": "人事部門 is the human resources department." },
+    { "question": "What does 部門經理 mean?", "options": ["department manager", "movie director", "office worker", "interior designer"], "answer": "department manager", "explanation": "部門 = department, 經理 = manager." }
+  ]
+},
+{
+  "day": 9,
+  "character": "厲害",
+  "pinyin": "lìhài",
+  "meaning": "impressive, awesome; also fierce, severe",
+  "usage": "Most often a compliment meaning someone is skilled or impressive. It can also mean something is intense or severe, like a bad pain or strong sun. The meaning depends on the sentence.",
+  "examples": [
+    { "zh": "你的中文真厲害！", "pinyin": "Nǐ de zhōngwén zhēn lìhài!", "en": "Your Chinese is really impressive!" },
+    { "zh": "這個老師很厲害，學生都很喜歡他。", "pinyin": "Zhège lǎoshī hěn lìhài, xuéshēng dōu hěn xǐhuān tā.", "en": "This teacher is great, and the students all like him." },
+    { "zh": "今天太陽曬得很厲害。", "pinyin": "Jīntiān tàiyáng shài de hěn lìhài.", "en": "The sun is really intense today." }
+  ],
+  "expressions": [
+    { "zh": "好厲害", "pinyin": "hǎo lìhài", "en": "so impressive" },
+    { "zh": "厲害的人", "pinyin": "lìhài de rén", "en": "a very capable person" },
+    { "zh": "痛得很厲害", "pinyin": "tòng de hěn lìhài", "en": "hurts badly" }
+  ],
+  "text": {
+    "zh": "小明今天在公司完成了一個大專案。老闆說：「你真厲害！」同事們也都稱讚他。小明很開心，可是他也累得很厲害，所以下班後馬上回家睡覺。",
+    "pinyin": "Xiǎomíng jīntiān zài gōngsī wánchéng le yí ge dà zhuān’àn. Lǎobǎn shuō: “Nǐ zhēn lìhài!” Tóngshìmen yě dōu chēngzàn tā. Xiǎomíng hěn kāixīn, kěshì tā yě lèi de hěn lìhài, suǒyǐ xiàbān hòu mǎshàng huí jiā shuìjiào.",
+    "en": "Xiaoming finished a big project at the company today. The boss said, “You're really impressive!” His coworkers all praised him too. Xiaoming was happy, but he was also extremely tired, so he went straight home to sleep after work."
+  },
+  "questions": [
+    { "question": "What does 厲害 usually mean as a compliment?", "options": ["impressive", "boring", "cheap", "quiet"], "answer": "impressive", "explanation": "你真厲害！ means You are really impressive!" },
+    { "question": "Your boss says 你真厲害！ How does he feel?", "options": ["He thinks you did great", "He is angry", "He is confused", "He wants you to leave"], "answer": "He thinks you did great", "explanation": "In this sentence 厲害 is praise." },
+    { "question": "In 痛得很厲害, what does 厲害 mean?", "options": ["very badly, severely", "impressive", "cheap", "lively"], "answer": "very badly, severely", "explanation": "After 得, 厲害 can describe how intense something is." }
+  ]
+},
+{
+  "day": 10,
+  "character": "加班",
+  "pinyin": "jiābān",
+  "meaning": "to work overtime",
+  "usage": "To keep working after normal working hours. 加 means to add and 班 means a work shift.",
+  "examples": [
+    { "zh": "我今天要加班。", "pinyin": "Wǒ jīntiān yào jiābān.", "en": "I have to work overtime today." },
+    { "zh": "他常常加班到很晚。", "pinyin": "Tā chángcháng jiābān dào hěn wǎn.", "en": "He often works overtime until late." },
+    { "zh": "最近公司很忙，大家都在加班。", "pinyin": "Zuìjìn gōngsī hěn máng, dàjiā dōu zài jiābān.", "en": "The company has been busy lately, and everyone is working overtime." }
+  ],
+  "expressions": [
+    { "zh": "加班費", "pinyin": "jiābānfèi", "en": "overtime pay" },
+    { "zh": "常常加班", "pinyin": "chángcháng jiābān", "en": "often work overtime" },
+    { "zh": "不用加班", "pinyin": "búyòng jiābān", "en": "no need to work overtime" }
+  ],
+  "text": {
+    "zh": "這個星期公司很忙，所以小李每天都加班。他回到家已經晚上十點了。老闆說，下個星期他可以早一點下班，也會有加班費。小李聽了很高興。",
+    "pinyin": "Zhège xīngqī gōngsī hěn máng, suǒyǐ Xiǎo Lǐ měitiān dōu jiābān. Tā huí dào jiā yǐjīng wǎnshàng shí diǎn le. Lǎobǎn shuō, xià ge xīngqī tā kěyǐ zǎo yìdiǎn xiàbān, yě huì yǒu jiābānfèi. Xiǎo Lǐ tīng le hěn gāoxìng.",
+    "en": "This week the company is very busy, so Xiao Li works overtime every day. By the time he gets home it is already 10 p.m. The boss says that next week he can get off work a bit earlier and will also get overtime pay. Xiao Li is very happy to hear that."
+  },
+  "questions": [
+    { "question": "What does 加班 mean?", "options": ["to work overtime", "to go shopping", "to chat online", "to watch a movie"], "answer": "to work overtime", "explanation": "加 = add, 班 = work shift, so 加班 is extra work time." },
+    { "question": "公司很忙，所以我今天要＿＿。", "options": ["加班", "血拼", "上癮", "嚇"], "answer": "加班", "explanation": "A busy company often means working overtime." },
+    { "question": "What does 加班費 mean?", "options": ["overtime pay", "ticket price", "school fee", "movie fee"], "answer": "overtime pay", "explanation": "費 means fee or money paid, so 加班費 is overtime pay." }
+  ]
+}
+    ],
+    "day": 2
   }
 ]
