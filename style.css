@@ -1,0 +1,17 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding: 20px;
+}
+#character {
+  font-size: 100px;
+}
+#pinyin {
+  font-size: 28px;
+  color: gray;
+}
+button {
+  font-size: 20px;
+  padding: 10px 20px;
+  margin-top: 15px;
+}
