@@ -3,41 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chinese Practice</title>
+  <title>中文練習</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Chinese Practice</h1>
+  <div id="app">
+    <header class="card bar">
+      <div class="brand"><span class="logo">中</span><span>中文練習</span></div>
+      <div class="wordnav">
+        <button id="prevWord" class="round" aria-label="上一個單字">‹</button>
+        <span id="wordLabel" class="chip"></span>
+        <button id="nextWord" class="round" aria-label="下一個單字">›</button>
+      </div>
+    </header>
 
-  <div id="nav">
-    <button id="prev">◀ Previous</button>
-    <span id="dayLabel"></span>
-    <button id="next">Next ▶</button>
-  </div>
+    <nav id="tabs"></nav>
 
-  <div id="lesson">Loading...</div>
+    <main id="stage" class="card">載入中…</main>
 
-  <!-- Admin area: only visible at the address ending in #admin -->
-  <div id="admin" hidden>
-    <div class="card" id="loginBox">
-      <h2>Admin login</h2>
-      <input id="email" type="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
-      <button id="loginBtn">Log in</button>
+    <div id="stepbar">
+      <button id="prevStep" class="btn ghost">上一步</button>
+      <button id="nextStep" class="btn primary">下一步</button>
     </div>
 
-    <div class="card" id="addBox" hidden>
-      <h2>Add a word</h2>
-      <textarea id="raw" rows="14" placeholder="Paste the word here (Character, Pinyin, Meaning, Usage, Example, Common expressions related, Questions to practice)"></textarea>
-      <button id="analyzeBtn">Analyze</button>
-      <div id="preview"></div>
-      <button id="saveBtn" hidden>Save to database</button>
-      <button id="logoutBtn" class="secondary">Log out</button>
-      <p id="adminStatus"></p>
-    </div>
-  </div>
+    <!-- 管理區：網址結尾加上 #admin 才會顯示 -->
+    <div id="admin" hidden>
+      <div class="card" id="loginBox">
+        <h2>管理員登入</h2>
+        <input id="email" type="email" placeholder="電子郵件">
+        <input id="password" type="password" placeholder="密碼">
+        <button id="loginBtn" class="btn primary">登入</button>
+      </div>
 
-  <footer><a href="#admin">Admin</a></footer>
+      <div class="card" id="addBox" hidden>
+        <h2>新增單字</h2>
+        <textarea id="raw" rows="14" placeholder="貼上單字內容（Character、Pinyin、Meaning、Usage、Example、Common expressions related、Questions to practice）"></textarea>
+        <button id="analyzeBtn" class="btn primary">分析</button>
+        <div id="preview"></div>
+        <button id="saveBtn" class="btn primary" hidden>儲存到資料庫</button>
+        <button id="logoutBtn" class="btn ghost">登出</button>
+        <p id="adminStatus"></p>
+      </div>
+    </div>
+
+    <footer><a href="#admin">管理</a></footer>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
