@@ -50,10 +50,17 @@ async function loadCurrent() {
 }
 
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+
+// The speaking practice must be passed (green microphone) before a word can be confirmed
+const spokenOK = () => !!word && localStorage.getItem("spoken") === word.code;
+
 const finishHTML = () => `
   <div class="finish">
     <p>已經複習完這個單字了嗎？確認後，這個單字不會再出現。</p>
-    <button id="finishBtn" class="check" aria-label="已複習完成">${CHECK}</button>
+    ${spokenOK() ? "" : `<p class="warn">請先完成「口說」練習（麥克風變成綠色），才能確認複習。</p>
+    <button class="btn ghost" data-step="1">前往口說練習</button>`}
+    <button id="finishBtn" class="check" ${spokenOK() ? "" : "disabled"} aria-label="已複習完成">${CHECK}</button>
     <div id="pinBox" hidden>
       <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="請輸入密碼">
       <button id="pinBtn" class="btn primary">確認</button>
@@ -127,7 +134,7 @@ function summaryHTML(d) {
 }
 
 function stepsFor(d) {
-  const s = [{ id: "word", title: "單字" }];
+  const s = [{ id: "word", title: "單字" }, { id: "speak", title: "口說" }];
   if (d.usage) s.push({ id: "usage", title: "用法" });
   if (d.examples.length) s.push({ id: "examples", title: "例句" });
   if (d.expressions.length) s.push({ id: "expressions", title: "常用表達" });
@@ -148,6 +155,21 @@ function sectionHTML(id, d, title) {
           <div class="listen">${speakBtn(d.pronunciation)}<span>發音</span></div>
         </div>
         <div class="note"><small>意思</small><p>${d.meaning}</p></div>`;
+    case "speak": {
+      const ok = spokenOK();
+      return `<h2>${title}</h2>
+        <p class="body">按下麥克風，大聲唸出這個單字。</p>
+        <div class="hero">
+          <div class="hanzi">${d.character}</div>
+          <div class="py big">${d.pinyin}</div>
+          <div class="listen">${speakBtn(d.pronunciation)}<span>先聽一次</span></div>
+        </div>
+        <div class="finish">
+          <button id="micBtn" class="mic ${ok ? "ok" : ""}" aria-label="麥克風">${MIC}</button>
+          <p id="micMsg">${ok ? "答對了！發音正確。" : "按下麥克風開始"}</p>
+          <p id="heard" class="py"></p>
+        </div>`;
+    }
     case "usage":       return `<h2>${title}</h2><p class="body">${d.usage}</p>`;
     case "examples":    return `<h2>${title}</h2>${d.examples.map(item).join("")}`;
     case "expressions": return `<h2>${title}</h2>${d.expressions.map(item).join("")}`;
@@ -197,6 +219,7 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
+  if (e.target.closest("#micBtn")) { startListening(); return; }
   if (e.target.closest("#finishBtn")) { openPin(); return; }
   if (e.target.closest("#pinBtn")) { submitPin(); return; }
   const say = e.target.closest("[data-say]");
@@ -226,6 +249,7 @@ function openPin() {
 // The PIN is checked by the database. If correct, the word is marked as reviewed
 // and the next random unreviewed word is loaded.
 async function submitPin() {
+  if (!spokenOK()) { $("pinMsg").textContent = "請先完成「口說」練習。"; return; }
   const pin = $("pin").value.trim();
   if (!pin) { $("pinMsg").textContent = "請輸入密碼。"; return; }
 
@@ -242,6 +266,7 @@ async function submitPin() {
       "尚未設定密碼，請先在 Supabase 執行 set-pin.sql。";
     return;
   }
+  localStorage.removeItem("spoken");
   if (!data.next) { showDone(); window.scrollTo(0, 0); return; }
   word = await fetchWord(data.next);
   step = 0;
@@ -251,6 +276,84 @@ async function submitPin() {
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.id === "pin") submitPin();
 });
+
+/* ---------- Speaking practice (browser speech recognition) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const zhOnly = s => String(s).replace(/[^\u4e00-\u9fff]/g, "");
+const hasPy = typeof pinyinPro !== "undefined";
+const toPy = s => pinyinPro.pinyin(s, { toneType: "num", type: "array" });
+let listening = false;
+
+function seqIncludes(hay, needle) {
+  if (!needle.length) return false;
+  for (let i = 0; i + needle.length <= hay.length; i++) {
+    if (needle.every((p, j) => hay[i + j] === p)) return true;
+  }
+  return false;
+}
+
+// Correct if any recognized alternative contains the same characters,
+// or the same syllables WITH the same tones (so homophone characters still count)
+function isMatch(alts, target) {
+  const t = zhOnly(target);
+  const tp = hasPy ? toPy(t) : null;
+  return alts.some(a => {
+    const s = zhOnly(a);
+    if (s.includes(t)) return true;
+    return tp ? seqIncludes(toPy(s), tp) : false;
+  });
+}
+
+function setMic(state, msg, heard) {
+  const b = $("micBtn");
+  if (!b) return;   // the user left this section
+  b.className = "mic " + state;
+  $("micMsg").textContent = msg;
+  if (heard !== undefined) $("heard").textContent = heard;
+}
+
+function startListening() {
+  if (listening) return;
+  if (!SR) {
+    setMic("bad", "這個瀏覽器不支援語音辨識。請改用 Chrome（Android）或 Safari（iPhone）。");
+    return;
+  }
+  const rec = new SR();
+  rec.lang = "zh-TW";
+  rec.interimResults = false;
+  rec.continuous = false;
+  rec.maxAlternatives = 5;
+
+  let gotResult = false;
+  listening = true;
+  speechSynthesis.cancel();
+  setMic("listening", "請說話…", "");
+
+  rec.onresult = e => {
+    gotResult = true;
+    const alts = Array.from(e.results[0]).map(r => r.transcript);
+    if (isMatch(alts, word.character)) {
+      localStorage.setItem("spoken", word.code);
+      setMic("ok", "答對了！發音正確。", "聽到：" + alts[0]);
+    } else {
+      setMic("bad", "再試一次", "聽到：" + alts[0]);
+    }
+  };
+  rec.onerror = e => {
+    gotResult = true;
+    setMic("bad",
+      e.error === "not-allowed" || e.error === "service-not-allowed" ? "請允許使用麥克風，然後再試一次。" :
+      e.error === "no-speech" ? "沒有聽到聲音，再試一次。" :
+      "辨識失敗（" + e.error + "），再試一次。");
+  };
+  rec.onend = () => {
+    listening = false;
+    if (!gotResult) setMic("bad", "沒有聽到聲音，再試一次。");
+  };
+
+  try { rec.start(); }
+  catch (err) { listening = false; setMic("bad", "無法啟動麥克風，再試一次。"); }
+}
 $("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
 
 /* ---------- Text parser (pasted block -> word object) ---------- */
