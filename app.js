@@ -52,8 +52,13 @@ async function loadCurrent() {
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const finishHTML = () => `
   <div class="finish">
+    <p>已經複習完這個單字了嗎？確認後，這個單字不會再出現。</p>
     <button id="finishBtn" class="check" aria-label="已複習完成">${CHECK}</button>
-    <p>已複習完成，換下一個單字</p>
+    <div id="pinBox" hidden>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="請輸入密碼">
+      <button id="pinBtn" class="btn primary">確認</button>
+    </div>
+    <p id="pinMsg"></p>
   </div>`;
 
 function speak(text) {
@@ -118,8 +123,7 @@ function summaryHTML(d) {
     ${block("例句", d.examples.map(item).join(""))}
     ${block("常用表達", d.expressions.map(item).join(""))}
     ${block("短文", textBody(d.text))}
-    ${block("練習題", summaryQuestions(d))}
-    ${finishHTML()}`;
+    ${block("練習題", summaryQuestions(d))}`;
 }
 
 function stepsFor(d) {
@@ -130,6 +134,7 @@ function stepsFor(d) {
   if (d.text && d.text.zh) s.push({ id: "text", title: "短文" });
   if (d.questions.length) s.push({ id: "practice", title: "練習題" });
   s.push({ id: "summary", title: "總結" });
+  s.push({ id: "confirm", title: "確認" });
   return s;
 }
 
@@ -148,6 +153,7 @@ function sectionHTML(id, d, title) {
     case "expressions": return `<h2>${title}</h2>${d.expressions.map(item).join("")}`;
     case "text":        return `<h2>${title}</h2>${textBody(d.text)}`;
     case "practice":    return `<h2>${title}</h2>${practiceBody(d)}`;
+    case "confirm":     return `<h2>${title}</h2>${finishHTML()}`;
     default:            return summaryHTML(d);
   }
 }
@@ -191,7 +197,8 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
-  if (e.target.closest("#finishBtn")) { finishWord(); return; }
+  if (e.target.closest("#finishBtn")) { openPin(); return; }
+  if (e.target.closest("#pinBtn")) { submitPin(); return; }
   const say = e.target.closest("[data-say]");
   if (say) { speak(say.dataset.say); return; }
   const opt = e.target.closest(".option");
@@ -210,21 +217,40 @@ function showDone() {
   $("stage").textContent = "所有單字都學完了！請新增新的單字。";
 }
 
-// Big check: mark this word as reviewed, then load the next random one
-async function finishWord() {
-  const btn = $("finishBtn");
-  btn.disabled = true;
-  const { data: code, error } = await sb.rpc("complete_word", { p_code: word.code });
-  if (error) {
-    btn.disabled = false;
-    alert("無法儲存：" + error.message);
+// Big check: first ask for the PIN
+function openPin() {
+  $("pinBox").hidden = false;
+  $("pin").focus();
+}
+
+// The PIN is checked by the database. If correct, the word is marked as reviewed
+// and the next random unreviewed word is loaded.
+async function submitPin() {
+  const pin = $("pin").value.trim();
+  if (!pin) { $("pinMsg").textContent = "請輸入密碼。"; return; }
+
+  $("pinBtn").disabled = true;
+  const { data, error } = await sb.rpc("complete_word", { p_code: word.code, p_pin: pin });
+  $("pinBtn").disabled = false;
+
+  if (error) { $("pinMsg").textContent = "無法儲存：" + error.message; return; }
+  if (!data.ok) {
+    $("pin").value = "";
+    $("pinMsg").textContent =
+      data.reason === "locked" ? `嘗試次數過多，請 ${data.minutes} 分鐘後再試。` :
+      data.reason === "wrong_pin" ? `密碼錯誤，還可以再試 ${data.left} 次。` :
+      "尚未設定密碼，請先在 Supabase 執行 set-pin.sql。";
     return;
   }
-  if (!code) { showDone(); window.scrollTo(0, 0); return; }
-  word = await fetchWord(code);
+  if (!data.next) { showDone(); window.scrollTo(0, 0); return; }
+  word = await fetchWord(data.next);
   step = 0;
   render();
 }
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "pin") submitPin();
+});
 $("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
 
 /* ---------- Text parser (pasted block -> word object) ---------- */

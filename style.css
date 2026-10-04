@@ -140,3 +140,21 @@ footer a { color: var(--muted); }
 #pinBox { margin-top: 20px; }
 #pin { text-align: center; font-size: 22px; letter-spacing: 6px; }
 #pinMsg { min-height: 1.5em; font-size: 14px; }
+
+/* Speaking practice microphone */
+.mic {
+  width: 96px; height: 96px; border-radius: 50%; border: 0;
+  background: var(--blue); color: var(--white);
+  display: inline-grid; place-items: center; cursor: pointer;
+}
+.mic svg { width: 44px; height: 44px; }
+.mic.listening { animation: pulse 1s infinite; }
+.mic.ok { background: #2e9e6b; }
+.mic.bad { background: #d64545; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(116, 142, 254, 0.5); }
+  100% { box-shadow: 0 0 0 22px rgba(116, 142, 254, 0); }
+}
+.finish #micMsg { color: var(--ink); font-weight: 500; margin: 14px 0 4px; }
+.finish .warn { color: #d64545; margin-bottom: 8px; }
+.finish .btn { margin: 4px 0 18px; }
