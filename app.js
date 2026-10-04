@@ -32,19 +32,29 @@ function mapWord(w) {
   };
 }
 
-// The database picks (once per day) a random word that was never shown before
-async function loadToday() {
-  const { data: code, error } = await sb.rpc("get_daily_word");
-  if (error) throw error;
-  if (!code) return null;
-  const { data, error: e2 } = await sb
+async function fetchWord(code) {
+  const { data, error } = await sb
     .from("words")
     .select("*, examples(*), expressions(*), questions(*)")
     .eq("code", code)
     .single();
-  if (e2) throw e2;
+  if (error) throw error;
   return mapWord(data);
 }
+
+// The database keeps the same word until it is reviewed, then picks a random unreviewed one
+async function loadCurrent() {
+  const { data: code, error } = await sb.rpc("get_current_word");
+  if (error) throw error;
+  return code ? fetchWord(code) : null;
+}
+
+const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const finishHTML = () => `
+  <div class="finish">
+    <button id="finishBtn" class="check" aria-label="已複習完成">${CHECK}</button>
+    <p>已複習完成，換下一個單字</p>
+  </div>`;
 
 function speak(text) {
   speechSynthesis.cancel();
@@ -108,7 +118,8 @@ function summaryHTML(d) {
     ${block("例句", d.examples.map(item).join(""))}
     ${block("常用表達", d.expressions.map(item).join(""))}
     ${block("短文", textBody(d.text))}
-    ${block("練習題", summaryQuestions(d))}`;
+    ${block("練習題", summaryQuestions(d))}
+    ${finishHTML()}`;
 }
 
 function stepsFor(d) {
@@ -153,8 +164,7 @@ function render() {
 
   const last = step === steps.length - 1;
   $("prevStep").disabled = step === 0;
-  $("nextStep").textContent = last ? "完成" : "下一步";
-  $("nextStep").disabled = last;
+  $("nextStep").hidden = last;   // on the summary the big check button takes over
 
   window.scrollTo(0, 0);
 }
@@ -181,6 +191,7 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
+  if (e.target.closest("#finishBtn")) { finishWord(); return; }
   const say = e.target.closest("[data-say]");
   if (say) { speak(say.dataset.say); return; }
   const opt = e.target.closest(".option");
@@ -192,6 +203,28 @@ document.addEventListener("click", e => {
 $("nextStep").onclick = () => {
   if (step < stepsFor(word).length - 1) { step++; render(); }
 };
+
+function showDone() {
+  $("tabs").hidden = true;
+  $("stepbar").hidden = true;
+  $("stage").textContent = "所有單字都學完了！請新增新的單字。";
+}
+
+// Big check: mark this word as reviewed, then load the next random one
+async function finishWord() {
+  const btn = $("finishBtn");
+  btn.disabled = true;
+  const { data: code, error } = await sb.rpc("complete_word", { p_code: word.code });
+  if (error) {
+    btn.disabled = false;
+    alert("無法儲存：" + error.message);
+    return;
+  }
+  if (!code) { showDone(); window.scrollTo(0, 0); return; }
+  word = await fetchWord(code);
+  step = 0;
+  render();
+}
 $("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
 
 /* ---------- Text parser (pasted block -> word object) ---------- */
@@ -326,8 +359,8 @@ $("saveBtn").onclick = async () => {
       : "❌ " + error.message;
     return;
   }
-  // Today's word stays on screen; the new word joins the pool for future days
-  $("adminStatus").textContent = "✅ 已儲存，編號 " + data + "。它會在之後的某一天隨機出現。";
+  // The current word stays on screen; the new word joins the pool of unreviewed words
+  $("adminStatus").textContent = "✅ 已儲存，編號 " + data + "。它會在之後隨機出現。";
   $("raw").value = "";
   $("preview").innerHTML = "";
   $("saveBtn").hidden = true;
@@ -339,14 +372,9 @@ $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
   month: "long", day: "numeric", weekday: "long"
 });
 
-loadToday()
+loadCurrent()
   .then(w => {
-    if (!w) {
-      $("tabs").hidden = true;
-      $("stepbar").hidden = true;
-      $("stage").textContent = "所有單字都學完了！請新增新的單字。";
-      return;
-    }
+    if (!w) { showDone(); return; }
     word = w;
     render();
   })

@@ -123,3 +123,20 @@ textarea:focus, input:focus { outline: 2px solid var(--blue); }
 #adminStatus { font-size: 14px; }
 footer { text-align: center; margin: 24px 0; font-size: 13px; }
 footer a { color: var(--muted); }
+
+/* Big check button at the end of the summary */
+.finish { text-align: center; margin-top: 32px; }
+.check {
+  width: 96px; height: 96px; border-radius: 50%; border: 0;
+  background: var(--blue); color: var(--white);
+  display: inline-grid; place-items: center; cursor: pointer;
+}
+.check svg { width: 48px; height: 48px; }
+.check:disabled { opacity: 0.5; cursor: default; }
+.finish p { color: var(--muted); margin: 10px 0 0; }
+
+/* PIN field in the confirm section */
+.finish > p:first-child { margin: 0 0 18px; }
+#pinBox { margin-top: 20px; }
+#pin { text-align: center; font-size: 22px; letter-spacing: 6px; }
+#pinMsg { min-height: 1.5em; font-size: 14px; }
