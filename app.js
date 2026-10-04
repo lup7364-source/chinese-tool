@@ -1,11 +1,11 @@
 // SUPABASE_URL and SUPABASE_KEY come from config.js
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let days = [];
-let index = 0;        // current word
-let step = 0;         // current section of the word
+let word = null;      // today's word
+let step = 0;         // current section
 let correctCount = 0;
 let parsed = null;
+let adminOpen = false;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/"/g, "&quot;");
@@ -15,15 +15,10 @@ const isChoice = q => q.options && q.options.length > 0;
 const SPK = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
 const speakBtn = t => `<button class="speak" data-say="${esc(t)}" aria-label="發音">${SPK}</button>`;
 
-/* ---------- Load words ---------- */
-async function loadDays() {
-  const { data, error } = await sb
-    .from("words")
-    .select("*, examples(*), expressions(*), questions(*)")
-    .order("study_order");
-  if (error) throw error;
+/* ---------- Today's word ---------- */
+function mapWord(w) {
   const bySort = (a, b) => a.sort - b.sort;
-  return data.map(w => ({
+  return {
     code: w.code,
     character: w.hanzi,
     pinyin: w.pinyin,
@@ -34,7 +29,21 @@ async function loadDays() {
     expressions: w.expressions.sort(bySort),
     text: { zh: w.text_zh, pinyin: w.text_pinyin, en: w.text_en },
     questions: w.questions.sort(bySort)
-  }));
+  };
+}
+
+// The database picks (once per day) a random word that was never shown before
+async function loadToday() {
+  const { data: code, error } = await sb.rpc("get_daily_word");
+  if (error) throw error;
+  if (!code) return null;
+  const { data, error: e2 } = await sb
+    .from("words")
+    .select("*, examples(*), expressions(*), questions(*)")
+    .eq("code", code)
+    .single();
+  if (e2) throw e2;
+  return mapWord(data);
 }
 
 function speak(text) {
@@ -134,33 +143,26 @@ function sectionHTML(id, d, title) {
 
 /* ---------- Render ---------- */
 function render() {
-  const d = days[index];
-  const steps = stepsFor(d);
+  const steps = stepsFor(word);
   step = Math.min(step, steps.length - 1);
   correctCount = 0;
 
-  $("wordLabel").textContent = `第 ${index + 1} / ${days.length} 個 · ${d.code}`;
-  $("prevWord").disabled = index === 0;
-  $("nextWord").disabled = index === days.length - 1;
-
   $("tabs").innerHTML = steps.map((s, i) =>
     `<button class="tab ${i === step ? "active" : ""}" data-step="${i}">${s.title}</button>`).join("");
-  $("stage").innerHTML = sectionHTML(steps[step].id, d, steps[step].title);
+  $("stage").innerHTML = sectionHTML(steps[step].id, word, steps[step].title);
 
   const last = step === steps.length - 1;
-  const hasMoreWords = index < days.length - 1;
   $("prevStep").disabled = step === 0;
-  $("nextStep").textContent = !last ? "下一步" : hasMoreWords ? "下一個單字" : "完成";
-  $("nextStep").disabled = last && !hasMoreWords;
+  $("nextStep").textContent = last ? "完成" : "下一步";
+  $("nextStep").disabled = last;
 
   window.scrollTo(0, 0);
-  localStorage.setItem("lastDay", index);
 }
 
 function checkAnswer(btn) {
   const qi = Number(btn.dataset.q);
   const oi = Number(btn.dataset.o);
-  const q = days[index].questions[qi];
+  const q = word.questions[qi];
   const box = $("q" + qi);
   if (box.dataset.done) return;
   box.dataset.done = "1";
@@ -174,7 +176,7 @@ function checkAnswer(btn) {
   }
   $("fb" + qi).textContent = (correct ? "答對了！ " : "再試試。 ") + (q.explanation || "");
   if (correct) correctCount++;
-  $("score").textContent = `得分：${correctCount} / ${days[index].questions.filter(isChoice).length}`;
+  $("score").textContent = `得分：${correctCount} / ${word.questions.filter(isChoice).length}`;
 }
 
 /* ---------- Events ---------- */
@@ -188,13 +190,9 @@ document.addEventListener("click", e => {
 });
 
 $("nextStep").onclick = () => {
-  if (step < stepsFor(days[index]).length - 1) step++;
-  else if (index < days.length - 1) { index++; step = 0; }
-  render();
+  if (step < stepsFor(word).length - 1) { step++; render(); }
 };
 $("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
-$("prevWord").onclick = () => { index--; step = 0; render(); };
-$("nextWord").onclick = () => { index++; step = 0; render(); };
 
 /* ---------- Text parser (pasted block -> word object) ---------- */
 const HEADERS = {
@@ -273,15 +271,23 @@ function previewHTML(w) {
 }
 
 /* ---------- Admin (add words) ---------- */
-async function initAdmin() {
-  const on = location.hash === "#admin";
-  $("admin").hidden = !on;
-  if (!on) return;
+async function refreshAdmin() {
   const { data } = await sb.auth.getSession();
   $("loginBox").hidden = !!data.session;
   $("addBox").hidden = !data.session;
 }
-window.addEventListener("hashchange", initAdmin);
+
+// The same button opens and closes the admin area
+function setAdmin(open) {
+  adminOpen = open;
+  $("admin").hidden = !open;
+  $("adminToggle").textContent = open ? "隱藏管理" : "管理";
+  if (open) {
+    refreshAdmin();
+    $("admin").scrollIntoView({ behavior: "smooth" });
+  }
+}
+$("adminToggle").onclick = e => { e.preventDefault(); setAdmin(!adminOpen); };
 
 $("loginBtn").onclick = async () => {
   const { error } = await sb.auth.signInWithPassword({
@@ -290,10 +296,10 @@ $("loginBtn").onclick = async () => {
   });
   if (error) { alert("登入失敗：" + error.message); return; }
   $("password").value = "";
-  initAdmin();
+  refreshAdmin();
 };
 
-$("logoutBtn").onclick = async () => { await sb.auth.signOut(); initAdmin(); };
+$("logoutBtn").onclick = async () => { await sb.auth.signOut(); refreshAdmin(); };
 
 $("analyzeBtn").onclick = () => {
   $("adminStatus").textContent = "";
@@ -320,29 +326,33 @@ $("saveBtn").onclick = async () => {
       : "❌ " + error.message;
     return;
   }
-  $("adminStatus").textContent = "✅ 已儲存，編號 " + data;
+  // Today's word stays on screen; the new word joins the pool for future days
+  $("adminStatus").textContent = "✅ 已儲存，編號 " + data + "。它會在之後的某一天隨機出現。";
   $("raw").value = "";
   $("preview").innerHTML = "";
   $("saveBtn").hidden = true;
   parsed = null;
-  days = await loadDays();
-  index = Math.max(0, days.findIndex(d => d.code === data));
-  step = 0;
-  render();
 };
 
 /* ---------- Start ---------- */
-loadDays()
-  .then(data => {
-    if (data.length === 0) {
-      $("stage").textContent = "資料庫裡還沒有單字。";
+$("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
+  month: "long", day: "numeric", weekday: "long"
+});
+
+loadToday()
+  .then(w => {
+    if (!w) {
+      $("tabs").hidden = true;
+      $("stepbar").hidden = true;
+      $("stage").textContent = "所有單字都學完了！請新增新的單字。";
       return;
     }
-    days = data;
-    index = Math.min(Number(localStorage.getItem("lastDay")) || 0, days.length - 1);
+    word = w;
     render();
   })
   .catch(err => {
+    $("tabs").hidden = true;
+    $("stepbar").hidden = true;
     $("stage").textContent = "無法載入單字：" + err.message;
   })
-  .finally(initAdmin);
+  .finally(() => { if (location.hash === "#admin") setAdmin(true); });
