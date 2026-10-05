@@ -219,6 +219,8 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
+  const mode = e.target.closest("[data-mode]");
+  if (mode) { setView(mode.dataset.mode); return; }
   if (e.target.closest("#micBtn")) { startListening(); return; }
   if (e.target.closest("#finishBtn")) { openPin(); return; }
   if (e.target.closest("#pinBtn")) { submitPin(); return; }
@@ -227,7 +229,19 @@ document.addEventListener("click", e => {
   const opt = e.target.closest(".option");
   if (opt) { checkAnswer(opt); return; }
   const tab = e.target.closest("[data-step]");
-  if (tab) { step = Number(tab.dataset.step); render(); }
+  if (tab) { step = Number(tab.dataset.step); render(); return; }
+
+  // Home page, phrases list and tabs, flip cards
+  const go = e.target.closest("[data-go]");
+  if (go) { setScreen(go.dataset.go); return; }
+  if (e.target.closest("#homeBtn")) { setScreen("home"); return; }
+  const ph = e.target.closest("[data-phrase]");
+  if (ph) { curPhrase = phrases.find(p => p.code === ph.dataset.phrase); pTab = "info"; renderPhrases(); return; }
+  if (e.target.closest("[data-pback]")) { curPhrase = null; renderPhrases(); return; }
+  const pt = e.target.closest("[data-ptab]");
+  if (pt) { pTab = pt.dataset.ptab; renderPhrases(); return; }
+  const fc = e.target.closest(".fc");
+  if (fc) fc.classList.toggle("flipped");
 });
 
 $("nextStep").onclick = () => {
@@ -437,6 +451,8 @@ async function refreshAdmin() {
   const { data } = await sb.auth.getSession();
   $("loginBox").hidden = !!data.session;
   $("addBox").hidden = !data.session;
+  $("phraseBox").hidden = !data.session;
+  $("logoutBtn").hidden = !data.session;
 }
 
 // The same button opens and closes the admin area
@@ -495,6 +511,451 @@ $("saveBtn").onclick = async () => {
   $("saveBtn").hidden = true;
   parsed = null;
 };
+
+/* ---------- Daily read (Chinese Reading Practice) ---------- */
+const CRP_API = "https://chinesereadingpractice.com/wp-json/wp/v2/posts";
+let readLoaded = false;
+
+// Simplified -> Traditional (Taiwan wording). If the library failed to load, text stays as is.
+const toTw = typeof OpenCC !== "undefined" ? OpenCC.Converter({ from: "cn", to: "twp" }) : null;
+const tw = s => (toTw ? toTw(s) : s);
+
+// External text is never inserted as raw HTML
+const escHTML = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const decodeHTML = s => new DOMParser().parseFromString(s, "text/html").body.textContent;
+
+const taipeiDate = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+const dayHash = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+
+// One article per day: chosen by a number derived from the date, so every device
+// picks the same one. It is kept in this browser only, so the site is asked once a day.
+async function fetchDailyPost() {
+  const today = taipeiDate();
+  try {
+    const cached = JSON.parse(localStorage.getItem("dailyRead") || "null");
+    if (cached && cached.date === today) return cached.post;
+  } catch (e) { /* ignore a broken cache */ }
+
+  const fields = "id,link,title,content";
+  const head = await fetch(`${CRP_API}?per_page=1&_fields=id`);
+  if (!head.ok) throw new Error("HTTP " + head.status);
+  const total = Number(head.headers.get("X-WP-Total"));
+
+  let res;
+  if (total > 0) {
+    const idx = dayHash(today) % total;
+    res = await fetch(`${CRP_API}?per_page=1&page=${idx + 1}&orderby=date&order=asc&_fields=${fields}`);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    var post = (await res.json())[0];
+  } else {
+    // The site did not tell us how many articles exist: choose among the latest 100
+    const list = await (await fetch(`${CRP_API}?per_page=100&_fields=id`)).json();
+    const id = list[dayHash(today) % list.length].id;
+    res = await fetch(`${CRP_API}/${id}?_fields=${fields}`);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    post = await res.json();
+  }
+  localStorage.setItem("dailyRead", JSON.stringify({ date: today, post }));
+  return post;
+}
+
+// Turns the article HTML into: vocabulary lines, Chinese paragraphs, English paragraphs
+function parseLesson(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const sections = [];
+  let cur = { heading: "", lines: [] };
+  doc.body.querySelectorAll("h1,h2,h3,h4,h5,h6,p,li").forEach(n => {
+    if (/^H[1-6]$/.test(n.tagName)) {
+      if (cur.lines.length) sections.push(cur);
+      cur = { heading: n.textContent.trim(), lines: [] };
+      return;
+    }
+    const clone = n.cloneNode(true);
+    clone.querySelectorAll("br").forEach(br => br.replaceWith("\n"));
+    clone.textContent.split("\n").map(t => t.trim()).filter(Boolean)
+      .filter(t => !/show english translation/i.test(t))
+      .forEach(t => cur.lines.push(t));
+  });
+  if (cur.lines.length) sections.push(cur);
+
+  const vocab = [], zh = [], en = [];
+  sections.forEach(sec => {
+    if (/vocab/i.test(sec.heading)) {
+      sec.lines.forEach(l => {
+        const p = l.split(/\s+[–—-]\s+/);        // 从来 – cóng lái – always
+        vocab.push({ zh: p[0], py: p.length > 2 ? p[1] : "", en: p.length > 2 ? p.slice(2).join(" – ") : (p[1] || "") });
+      });
+    } else {
+      sec.lines.forEach(l => (hasZh(l) ? zh : en).push(l));
+    }
+  });
+  return { vocab, zh, en };
+}
+
+function readHTML(post) {
+  const title = tw(decodeHTML(post.title.rendered));
+  const { vocab, zh, en } = parseLesson(post.content.rendered);
+  const link = String(post.link).startsWith("https://chinesereadingpractice.com/") ? post.link : "https://chinesereadingpractice.com/";
+  const row = (text, pinyin, trans) => {
+    const t = tw(text);
+    return `<div class="item">
+      <div class="row"><div class="zh">${escHTML(t)}</div>${speakBtn(escHTML(t))}</div>
+      ${pinyin ? `<div class="py">${escHTML(pinyin)}</div>` : ""}
+      ${trans ? `<div>${escHTML(trans)}</div>` : ""}
+    </div>`;
+  };
+  return `
+    <h2>每日閱讀</h2>
+    <h3 class="read-title">${escHTML(title)}</h3>
+    ${vocab.length ? `<section class="blk"><h3>重點詞彙</h3>${vocab.map(v => row(v.zh, v.py, v.en)).join("")}</section>` : ""}
+    ${zh.length ? `<section class="blk"><h3>課文</h3>${zh.map(p => row(p)).join("")}</section>` : ""}
+    ${en.length ? `<details class="blk"><summary>顯示英文翻譯</summary>${en.map(p => `<p class="body">${escHTML(p)}</p>`).join("")}</details>` : ""}
+    <p class="source">來源：<a href="${escHTML(link)}" target="_blank" rel="noopener">Chinese Reading Practice</a>（作者 Kendra）。原文為簡體字，此處自動轉為繁體${toTw ? "" : "（轉換工具載入失敗，目前顯示簡體）"}。</p>`;
+}
+
+async function loadRead() {
+  const box = $("reader");
+  box.textContent = "載入中…";
+  try {
+    box.innerHTML = readHTML(await fetchDailyPost());
+    readLoaded = true;
+  } catch (err) {
+    box.innerHTML = `<h2>每日閱讀</h2>
+      <p class="body">今天的文章暫時無法載入（${escHTML(err.message)}）。</p>
+      <p class="source"><a href="https://chinesereadingpractice.com/" target="_blank" rel="noopener">直接前往 Chinese Reading Practice</a></p>`;
+  }
+}
+
+function setView(v) {
+  document.body.classList.toggle("reading", v === "read");
+  document.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === v));
+  if (v === "read" && !readLoaded) loadRead();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- Phrase parser (pasted textbook page -> phrase object) ---------- */
+const LATIN_JUNK = /[\p{Script=Latin}\p{M}\d]+/gu;
+const stripBase = t => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Counts syllables: every run of vowels is split into valid pinyin finals (hei+an -> 2)
+const FINALS = /iao|uai|ai|ei|ao|ou|ia|ie|ua|uo|ui|iu|ue|a|o|e|i|u/g;
+const syllables = t => (stripBase(t).toLowerCase().match(/[aeiou]+/g) || [])
+  .reduce((n, run) => n + (run.match(FINALS) || []).length, 0);
+const isPinyinToken = t => /^[a-z]+$/i.test(stripBase(t));
+// Keeps only the Chinese: drops pinyin letters, digits and tone marks
+const cleanZh = s => s.replace(LATIN_JUNK, " ").replace(/,/g, "，").replace(/\s+/g, " ").trim();
+
+// "1. 膽小 dănxião timid; fearful"  ->  { num, word, pinyin, meaning }
+function parseVocabEntry(num, body) {
+  body = body.trim();
+  const wm = body.match(/^[\u4e00-\u9fff]+/);
+  const word = wm ? wm[0] : "";
+  const rest = body.slice(word.length).split(/[\u4e00-\u9fff]/)[0].trim();   // stop at stray page footers
+  const tokens = rest ? rest.split(/\s+/) : [];
+  const need = word ? word.length : 1;       // one syllable per Chinese character
+  let i = 0, syl = 0;
+  while (i < tokens.length && syl < need && isPinyinToken(tokens[i])) {
+    syl += Math.max(1, syllables(tokens[i]));
+    i++;
+  }
+  return { num: Number(num), word, pinyin: tokens.slice(0, i).join(" "), meaning: tokens.slice(i).join(" ") };
+}
+
+// Clean markdown format:  # 【成語】, **拼音：**, **詞性：**, **解釋：**,
+// **Explanation / Definition:**, **例句：**, ## 例文, ## 生詞 Vocabulary + a table
+const MD_LABELS = [
+  [/^\*{0,2}\s*拼音\s*\*{0,2}\s*[：:]\s*\*{0,2}\s*(.*)$/, "pinyin"],
+  [/^\*{0,2}\s*詞性\s*\*{0,2}\s*[：:]\s*\*{0,2}\s*(.*)$/, "pos"],
+  [/^\*{0,2}\s*解釋\s*\*{0,2}\s*[：:]\s*\*{0,2}\s*(.*)$/, "zh"],
+  [/^\*{0,2}\s*Explanation\s*\/\s*Definition\s*\*{0,2}\s*[：:]\s*\*{0,2}\s*(.*)$/i, "en"],
+  [/^\*{0,2}\s*例句\s*\*{0,2}\s*[：:]\s*\*{0,2}\s*(.*)$/, "example"],
+  [/^#{1,6}\s*例文\s*(.*)$/, "story"],
+  [/^#{1,6}\s*生詞.*$/, "vocab"]
+];
+
+function parsePhraseMd(raw) {
+  const m = raw.match(/[【\[]\s*([^】\]]+?)\s*[】\]]/);
+  if (!m) throw new Error("找不到【成語】，請確認貼上的內容有標題【成語】。");
+
+  const sec = { pinyin: [], pos: [], zh: [], en: [], example: [], story: [], vocab: [] };
+  let key = null;
+  raw.replace(/\r/g, "").split("\n").forEach(line => {
+    const l = line.trim();
+    if (/^-{3,}$/.test(l)) { key = null; return; }
+    const hit = MD_LABELS.find(([re]) => re.test(l));
+    if (hit) {
+      key = hit[1];
+      const v = (l.match(hit[0]) || [])[1];
+      if (v && key !== "vocab") sec[key].push(v.trim());
+      return;
+    }
+    if (key && l) sec[key].push(l);
+  });
+
+  const clean = s => s.replace(/\*\*/g, "").trim();
+  const vocab = sec.vocab
+    .filter(l => l.startsWith("|"))
+    .map(l => l.replace(/^\||\|$/g, "").split("|").map(c => c.trim()))
+    .filter(c => c.length >= 4 && /^\d+$/.test(c[0]))
+    .map(c => ({ num: Number(c[0]), word: c[1], pinyin: c[2], meaning: c.slice(3).join(" | ") }));
+
+  return {
+    phrase: m[1].replace(/\s/g, ""),
+    pinyin: clean(sec.pinyin.join(" ")),
+    pos: clean(sec.pos.join(" ")),
+    example: clean(sec.example.join(" ")),
+    explanation_zh: clean(sec.zh.join("")),
+    explanation_en: clean(sec.en.join(" ")),
+    story: sec.story.map(clean).join("\n"),     // one line per paragraph
+    vocab
+  };
+}
+
+// Picks the right parser for what was pasted
+function parsePhrase(raw) {
+  return /\*\*\s*拼音|\n\s*\|\s*\d+\s*\|/.test(raw) ? parsePhraseMd(raw) : parsePhraseScan(raw);
+}
+
+// Old format: text copied from a scanned book page
+function parsePhraseScan(raw) {
+  const t = raw.replace(/\s+/g, " ").trim();
+  const m = t.match(/[【\[]\s*([^】\]]+?)\s*[】\]]/);
+  if (!m) throw new Error("找不到【成語】，請確認貼上的內容從【成語】開始。");
+  const after = t.slice(m.index + m[0].length);
+
+  const posAt = after.search(/Part of Speech/i);
+  const pinyin = posAt > 0 ? after.slice(0, posAt).trim() : "";
+  const pos = (after.match(/Part of Speech\s*(.+?)\s*(?:Connotation|解釋|$)/i) || [])[1] || "";
+
+  // Example sentence + Chinese explanation sit between "Example" and "Explanation/Definition"
+  const exAt = after.search(/Example/i);
+  const defAt = after.search(/Explanation\s*\/\s*Definition/i);
+  let example = "", explanation_zh = "";
+  if (exAt >= 0 && defAt > exAt) {
+    const segs = cleanZh(after.slice(exAt + 7, defAt)).split(" ").filter(Boolean);
+    example = segs[0] || "";
+    explanation_zh = segs.slice(1).join("");
+  }
+  const en = after.match(/Explanation\s*\/\s*Definition\s*:?\s*(.+?)\s*(?:例文|$)/i);
+
+  // Story: between "例文" and the vocabulary list (the pinyin lines mixed in are removed)
+  const stAt = after.indexOf("例文");
+  const vAt = after.search(/生詞|Vocabulary/i);
+  let story = "";
+  if (stAt >= 0) {
+    story = cleanZh(after.slice(stAt + 2, vAt > stAt ? vAt : undefined))
+      .replace(/\s+/g, "").replace(/^[:：]+/, "").replace(/[“”]/g, "");   // stray scan marks
+  }
+
+  // Vocabulary: numbered entries after the word "Vocabulary"
+  const vocab = [];
+  const vm = after.search(/Vocabulary/i);
+  if (vm >= 0) {
+    const parts = after.slice(vm + 10).split(/(?:^|\s)(\d{1,3})\.\s+/);
+    for (let i = 1; i < parts.length; i += 2) vocab.push(parseVocabEntry(parts[i], parts[i + 1] || ""));
+  }
+
+  return {
+    phrase: m[1].replace(/\s/g, ""), pinyin, pos, example,
+    explanation_zh, explanation_en: en ? en[1] : "", story, vocab
+  };
+}
+
+/* ---------- Admin: editable form for a parsed phrase ---------- */
+const fld = (id, label, val, area) => `<label class="lbl">${label}</label>` +
+  (area ? `<textarea id="${id}" rows="5">${escHTML(val)}</textarea>`
+        : `<input id="${id}" value="${escHTML(val)}">`) +
+  `<small class="err" data-err="${id}"></small>`;
+
+function phraseFormHTML(p) {
+  return fld("pf_phrase", "成語", p.phrase) + fld("pf_pinyin", "拼音", p.pinyin) + fld("pf_pos", "詞性", p.pos)
+    + fld("pf_example", "例句", p.example) + fld("pf_zh", "解釋（中文）", p.explanation_zh, true)
+    + fld("pf_en", "解釋（英文）", p.explanation_en, true) + fld("pf_story", "故事", p.story, true)
+    + `<label class="lbl">生詞（共 ${p.vocab.length} 個）：請檢查每一列。缺少的內容請補上，不要的列把三格清空。</label>`
+    + p.vocab.map(v => `<div class="vrow" data-num="${v.num}"><span class="vnum">${v.num}</span>
+        <input class="v-word" value="${escHTML(v.word)}" placeholder="詞">
+        <input class="v-py" value="${escHTML(v.pinyin)}" placeholder="拼音">
+        <input class="v-mean" value="${escHTML(v.meaning)}" placeholder="意思">
+        <small class="err vrow-err"></small></div>`).join("");
+}
+
+function readPhraseForm() {
+  const val = id => $(id).value.trim();
+  const vocab = [...document.querySelectorAll("#pForm .vrow")].map(r => ({
+    num: Number(r.dataset.num),
+    word: r.querySelector(".v-word").value.trim(),
+    pinyin: r.querySelector(".v-py").value.trim(),
+    meaning: r.querySelector(".v-mean").value.trim()
+  })).filter(v => v.word || v.pinyin || v.meaning);
+  return {
+    phrase: val("pf_phrase"), pinyin: val("pf_pinyin"), pos: val("pf_pos"), example: val("pf_example"),
+    explanation_zh: val("pf_zh"), explanation_en: val("pf_en"), story: val("pf_story"), vocab
+  };
+}
+
+// Marks every problem field in red (with a short message) and returns how many there are
+const isZhOnly = s => /^[\u4e00-\u9fff]+$/.test(s);
+const isPinyin = s => /^[\p{Script=Latin}\p{M}\s'’-]+$/u.test(s);
+
+function validatePhraseForm() {
+  let bad = 0;
+  const flag = (el, msg) => { el.classList.toggle("bad", !!msg); if (msg) bad++; };
+
+  [
+    ["pf_phrase", v => !v ? "請填寫成語" : !isZhOnly(v) ? "成語只能是中文字" : ""],
+    ["pf_pinyin", v => !v ? "請填寫拼音" : !isPinyin(v) ? "拼音只能有英文字母和聲調符號" : ""],
+    ["pf_example", v => v ? "" : "請填寫例句"],
+    ["pf_zh", v => v ? "" : "請填寫中文解釋"],
+    ["pf_en", v => v ? "" : "請填寫英文解釋"],
+    ["pf_story", v => v ? "" : "請填寫故事"]
+  ].forEach(([id, rule]) => {
+    const el = $(id), msg = rule(el.value.trim());
+    flag(el, msg);
+    document.querySelector(`[data-err="${id}"]`).textContent = msg;
+  });
+
+  // A vocabulary row left completely empty is ignored; a half-filled row is an error
+  document.querySelectorAll("#pForm .vrow").forEach(r => {
+    const [w, p, m] = [".v-word", ".v-py", ".v-mean"].map(s => r.querySelector(s));
+    const [vw, vp, vm] = [w, p, m].map(x => x.value.trim());
+    const empty = !vw && !vp && !vm;
+    const wm = empty ? "" : !vw ? "缺少詞" : !isZhOnly(vw) ? "詞只能是中文字" : "";
+    const pm = empty ? "" : !vp ? "缺少拼音" : !isPinyin(vp) ? "拼音格式不對" : "";
+    const mm = empty ? "" : !vm ? "缺少意思" : /[\u4e00-\u9fff]/.test(vm) ? "意思裡有中文字（可能是多餘的內容）" : "";
+    flag(w, wm); flag(p, pm); flag(m, mm);
+    r.querySelector(".vrow-err").textContent = [wm, pm, mm].filter(Boolean).join("；");
+  });
+
+  $("pStatus").textContent = bad
+    ? `❌ 有 ${bad} 個地方要修正（紅色欄位）。修好後紅色會自動消失。`
+    : "✅ 沒有發現問題，可以按「儲存成語」。";
+  return bad;
+}
+
+// Re-check while you type, so red marks disappear as soon as a field is fixed
+$("pForm").addEventListener("input", () => validatePhraseForm());
+
+$("pAnalyzeBtn").onclick = () => {
+  try {
+    $("pForm").innerHTML = phraseFormHTML(parsePhrase($("praw").value));
+    $("pSaveBtn").hidden = false;
+    validatePhraseForm();
+  } catch (err) {
+    $("pForm").innerHTML = "";
+    $("pSaveBtn").hidden = true;
+    $("pStatus").textContent = "❌ " + err.message;
+  }
+};
+
+$("pSaveBtn").onclick = async () => {
+  if (validatePhraseForm()) {
+    const first = document.querySelector("#pForm .bad");
+    if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  const obj = readPhraseForm();
+  $("pSaveBtn").disabled = true;
+  const { data, error } = await sb.rpc("add_phrase", { p: obj });
+  $("pSaveBtn").disabled = false;
+  if (error) {
+    $("pStatus").textContent =
+      /duplicate key/i.test(error.message) ? "❌ 這個成語已經存在。" :
+      /not allowed/i.test(error.message) ? "❌ 沒有權限儲存：資料庫不認得這個登入帳號。請在 Supabase 執行 fix-phrases.sql。" :
+      "❌ " + error.message;
+    return;
+  }
+  $("pStatus").textContent = "✅ 已儲存，編號 " + data;
+  $("praw").value = "";
+  $("pForm").innerHTML = "";
+  $("pSaveBtn").hidden = true;
+};
+
+/* ---------- Screens: home / vocabulary / phrases ---------- */
+let phrases = [];
+let curPhrase = null;
+let pTab = "info";
+
+function setScreen(name) {
+  document.body.dataset.screen = name;
+  if (name === "phrases") openPhrases();
+  window.scrollTo(0, 0);
+}
+
+async function openPhrases() {
+  $("ptabs").hidden = true;
+  $("pbody").textContent = "載入中…";
+  try {
+    const { data, error } = await sb.from("phrases").select("*, phrase_vocab(*)").order("study_order");
+    if (error) throw error;
+    phrases = data;
+  } catch (err) {
+    $("pbody").textContent = "無法載入成語：" + err.message;
+    return;
+  }
+  curPhrase = null;
+  renderPhrases();
+}
+
+const zhRow = t => `<div class="item"><div class="row"><div class="zh">${escHTML(t)}</div>${speakBtn(escHTML(t))}</div></div>`;
+
+function listHTML() {
+  if (!phrases.length) return `<h2>成語</h2><p class="body">還沒有成語。請到頁面最下方的「管理」新增。</p>`;
+  return `<h2>成語</h2>` + phrases.map(p => `
+    <button class="plist" data-phrase="${escHTML(p.code)}">
+      <span class="zh">${escHTML(p.phrase)}</span><span class="py">${escHTML(p.pinyin || "")}</span>
+    </button>`).join("");
+}
+
+function infoHTML(p) {
+  return `<h2>成語</h2>
+    <div class="hero">
+      <div class="hanzi" style="font-size:64px">${escHTML(p.phrase)}</div>
+      <div class="py big">${escHTML(p.pinyin || "")}</div>
+      <div class="listen">${speakBtn(escHTML(p.phrase))}<span>發音</span></div>
+    </div>
+    ${p.pos ? `<div class="note"><small>詞性</small><p>${escHTML(p.pos)}</p></div>` : ""}
+    ${p.explanation_zh || p.explanation_en ? `<section class="blk"><h3>解釋</h3>
+      ${p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : ""}
+      ${p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""}</section>` : ""}
+    ${p.example ? `<section class="blk"><h3>例句</h3>${zhRow(p.example)}</section>` : ""}`;
+}
+
+// Numbered boxes: tap to flip and see the word, its pinyin and its meaning
+function vocabHTML(p) {
+  const list = [...p.phrase_vocab].sort((a, b) => a.num - b.num);
+  if (!list.length) return `<h2>生詞</h2><p class="body">這個成語還沒有生詞。</p>`;
+  return `<h2>生詞</h2><p class="py">點一下方塊翻面</p><div class="cards">` + list.map(v => `
+    <div class="fc"><div class="fc-in">
+      <div class="fc-front" style="font-size:${(v.word || "").length <= 2 ? 40 : (v.word || "").length <= 4 ? 32 : 24}px">${escHTML(v.word || v.num)}</div>
+      <div class="fc-back"><div class="fc-body">
+        <div class="zh">${escHTML(v.word || "")}</div>
+        <div class="py">${escHTML(v.pinyin || "")}</div>
+        <div class="fc-mean">${escHTML(v.meaning || "")}</div>
+        ${v.word ? speakBtn(escHTML(v.word)) : ""}
+      </div></div>
+    </div></div>`).join("") + `</div>`;
+}
+
+function storyHTML(p) {
+  if (!p.story) return `<h2>故事</h2><p class="body">這個成語還沒有故事。</p>`;
+  const parts = p.story.includes("\n")
+    ? p.story.split("\n").filter(Boolean)                 // paragraphs, as pasted
+    : (p.story.match(/[^。]+。?/g) || [p.story]);          // old format: one row per sentence
+  return `<h2>故事</h2>
+    <button class="btn ghost" data-say="${escHTML(p.story)}">朗讀全文</button>
+    <div style="margin-top:14px">${parts.map(zhRow).join("")}</div>`;
+}
+
+function renderPhrases() {
+  const nav = $("ptabs");
+  if (!curPhrase) { nav.hidden = true; $("pbody").innerHTML = listHTML(); return; }
+  nav.hidden = false;
+  nav.innerHTML = `<button class="tab" data-pback="1">‹ 列表</button>` +
+    [["info", "成語"], ["vocab", "生詞"], ["story", "故事"]].map(([id, t]) =>
+      `<button class="tab ${pTab === id ? "active" : ""}" data-ptab="${id}">${t}</button>`).join("");
+  $("pbody").innerHTML = pTab === "info" ? infoHTML(curPhrase) : pTab === "vocab" ? vocabHTML(curPhrase) : storyHTML(curPhrase);
+  window.scrollTo(0, 0);
+}
 
 /* ---------- Start ---------- */
 $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {

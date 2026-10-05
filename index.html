@@ -7,18 +7,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
-<body>
+<body data-screen="home">
   <div id="app">
     <header class="card bar">
-      <div class="brand"><span class="logo">中</span><span>中文練習</span></div>
+      <button id="homeBtn" class="brand" aria-label="首頁"><span class="logo">中</span><span>中文練習</span></button>
       <span id="dateLabel" class="chip"></span>
     </header>
+
+    <section id="home" class="card">
+      <h2>你想練習什麼？</h2>
+      <button class="bigchoice" data-go="vocab"><span class="zh">單字</span><small>Vocabulary</small></button>
+      <button class="bigchoice alt" data-go="phrases"><span class="zh">成語</span><small>Phrases</small></button>
+    </section>
+
+    <div id="modes">
+      <button class="mode active" data-mode="word">今日單字</button>
+      <button class="mode" data-mode="read">每日閱讀</button>
+    </div>
 
     <nav id="tabs"></nav>
 
     <main id="stage" class="card">載入中…</main>
+
+    <main id="reader" class="card">載入中…</main>
+
+    <section id="phrases">
+      <nav id="ptabs" hidden></nav>
+      <main id="pbody" class="card">載入中…</main>
+    </section>
 
     <div id="stepbar">
       <button id="prevStep" class="btn ghost">上一步</button>
@@ -40,17 +58,28 @@
         <button id="analyzeBtn" class="btn primary">分析</button>
         <div id="preview"></div>
         <button id="saveBtn" class="btn primary" hidden>儲存到資料庫</button>
-        <button id="logoutBtn" class="btn ghost">登出</button>
         <p id="adminStatus"></p>
       </div>
+
+      <div class="card" id="phraseBox" hidden>
+        <h2>新增成語</h2>
+        <textarea id="praw" rows="10" placeholder="貼上成語頁面的內容（從【成語】開始，到生詞表結束）"></textarea>
+        <button id="pAnalyzeBtn" class="btn primary">分析</button>
+        <div id="pForm"></div>
+        <button id="pSaveBtn" class="btn primary" hidden>儲存成語</button>
+        <p id="pStatus"></p>
+      </div>
+
+      <button id="logoutBtn" class="btn ghost" hidden>登出</button>
     </div>
 
     <footer><a href="#admin" id="adminToggle">管理</a></footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=6"></script>
+  <script src="config.js?v=11"></script>
   <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
-  <script src="app.js?v=6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

@@ -237,3 +237,20 @@ body[data-screen="phrases"] #stepbar, body[data-screen="phrases"] #reader { disp
 .vrow input { margin: 0; }
 .vrow .v-mean { grid-column: 2 / 4; }
 .vnum { color: var(--muted); font-size: 13px; text-align: center; }
+
+/* Admin: each mode only shows its own "add" form */
+body[data-screen="vocab"] #phraseBox,
+body[data-screen="phrases"] #addBox,
+body[data-screen="home"] #addBox,
+body[data-screen="home"] #phraseBox { display: none !important; }
+#logoutBtn { margin-bottom: 14px; }
+
+/* Red marks for fields that need to be corrected */
+input.bad, textarea.bad {
+  border-color: #d64545;
+  background: rgba(214, 69, 69, 0.08);
+  outline: 2px solid #d64545;
+}
+.err { display: block; color: #d64545; font-size: 12px; margin: -4px 0 6px; }
+.err:empty { display: none; }
+.vrow-err { grid-column: 1 / -1; margin: 0; }
