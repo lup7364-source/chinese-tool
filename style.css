@@ -158,3 +158,82 @@ footer a { color: var(--muted); }
 .finish #micMsg { color: var(--ink); font-weight: 500; margin: 14px 0 4px; }
 .finish .warn { color: #d64545; margin-bottom: 8px; }
 .finish .btn { margin: 4px 0 18px; }
+
+/* Mode switch: today's word / daily read */
+#modes {
+  display: flex; gap: 4px; padding: 4px; margin-bottom: 14px;
+  background: var(--white); border-radius: 999px;
+}
+.mode {
+  flex: 1; border: 0; border-radius: 999px; padding: 10px 14px;
+  background: transparent; color: var(--muted);
+  font: inherit; font-weight: 500; cursor: pointer;
+}
+.mode.active { background: var(--ink); color: var(--white); }
+
+body.reading #tabs,
+body.reading #stepbar,
+body.reading #stage { display: none !important; }
+body:not(.reading) #reader { display: none; }
+
+/* Daily read */
+.read-title { font-size: 20px; color: var(--ink); margin: 0 0 6px; }
+details.blk summary { cursor: pointer; font-weight: 500; }
+details.blk p { margin: 12px 0 0; }
+.source { font-size: 13px; color: var(--muted); margin-top: 24px; }
+.source a { color: var(--blue); }
+
+/* ===== Home, phrases ===== */
+.brand { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+#tabs, #ptabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  background: var(--white); border-radius: 20px; padding: 0 20px; margin-bottom: 14px;
+}
+
+/* Which parts are visible on each screen */
+#home, #phrases { display: none; }
+body[data-screen="home"] #home { display: block; }
+body[data-screen="phrases"] #phrases { display: block; }
+body[data-screen="home"] #modes, body[data-screen="home"] #tabs, body[data-screen="home"] #stage,
+body[data-screen="home"] #stepbar, body[data-screen="home"] #reader,
+body[data-screen="phrases"] #modes, body[data-screen="phrases"] #tabs, body[data-screen="phrases"] #stage,
+body[data-screen="phrases"] #stepbar, body[data-screen="phrases"] #reader { display: none !important; }
+
+.bigchoice {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; padding: 30px 16px; margin-top: 12px; border: 0; border-radius: 22px;
+  background: var(--ink); color: var(--white); font: inherit; cursor: pointer;
+}
+.bigchoice .zh { font-size: 36px; font-weight: 500; }
+.bigchoice small { opacity: 0.75; }
+.bigchoice.alt { background: var(--blue); }
+
+.plist {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; padding: 16px; margin-bottom: 10px; border: 0; border-radius: 16px;
+  background: var(--soft); color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+
+/* Flip cards (numbered vocabulary boxes) */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+.fc { perspective: 800px; height: 180px; cursor: pointer; }
+.fc-in { position: relative; width: 100%; height: 100%; transition: transform 0.5s; transform-style: preserve-3d; }
+.fc.flipped .fc-in { transform: rotateY(180deg); }
+.fc-front, .fc-back {
+  position: absolute; inset: 0; border-radius: 18px; padding: 10px;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  display: flex; text-align: center; overflow: auto;
+}
+.fc-front { background: var(--ink); color: var(--white); font-size: 40px; font-weight: 500; align-items: center; justify-content: center; }
+.fc-back { background: var(--line); transform: rotateY(180deg); }
+.fc-body { margin: auto; }
+.fc-body .zh { font-size: 24px; }
+.fc-mean { font-size: 13px; margin: 4px 0 6px; }
+.fc-body .speak { width: 32px; height: 32px; }
+
+/* Admin: phrase form */
+.lbl { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
+.vrow { display: grid; grid-template-columns: 28px 1fr 1fr; gap: 6px; margin-bottom: 8px; align-items: center; }
+.vrow input { margin: 0; }
+.vrow .v-mean { grid-column: 2 / 4; }
+.vnum { color: var(--muted); font-size: 13px; text-align: center; }
