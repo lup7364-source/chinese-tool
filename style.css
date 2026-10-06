@@ -254,3 +254,18 @@ input.bad, textarea.bad {
 .err { display: block; color: #d64545; font-size: 12px; margin: -4px 0 6px; }
 .err:empty { display: none; }
 .vrow-err { grid-column: 1 / -1; margin: 0; }
+
+/* Phrases: same step bar as vocabulary */
+#pstepbar { position: sticky; bottom: 12px; display: flex; gap: 10px; margin-bottom: 14px; }
+#pstepbar .primary { flex: 1; }
+
+/* Flashcards: "I know" button, typing box and green "done" state */
+.fc-front { flex-direction: column; gap: 8px; }
+.fc-ctl { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; font-size: 22px; }
+.know, .know-ok {
+  background: var(--blue); color: var(--white); border: 0; border-radius: 999px;
+  padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.know-in { margin: 0; padding: 6px 8px; font-size: 16px; text-align: center; max-width: 100%; }
+.fc.done .fc-front, .fc.done .fc-back { background: #2e9e6b; color: var(--white); }
+.fc.done .py { color: rgba(255, 255, 255, 0.85); }
