@@ -53,13 +53,20 @@ const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
 
 // The speaking practice must be passed (green microphone) before a word can be confirmed
-const spokenOK = () => !!word && localStorage.getItem("spoken") === word.code;
+const inPhrases = () => document.body.dataset.screen === "phrases";
 
-const finishHTML = () => `
+// What the speaking practice and the confirmation refer to right now (a word or a phrase)
+const currentTarget = () => inPhrases()
+  ? (curPhrase ? { code: curPhrase.code, text: curPhrase.phrase } : null)
+  : (word ? { code: word.code, text: word.character } : null);
+
+const spokenOK = () => { const t = currentTarget(); return !!t && localStorage.getItem("spoken") === t.code; };
+
+const finishHTML = (isPhrase = false) => `
   <div class="finish">
-    <p>已經複習完這個單字了嗎？確認後，這個單字不會再出現。</p>
+    <p>已經複習完這個${isPhrase ? "成語" : "單字"}了嗎？確認後，這個${isPhrase ? "成語" : "單字"}不會再出現。</p>
     ${spokenOK() ? "" : `<p class="warn">請先完成「口說」練習（麥克風變成綠色），才能確認複習。</p>
-    <button class="btn ghost" data-step="1">前往口說練習</button>`}
+    <button class="btn ghost" ${isPhrase ? "data-pstep" : "data-step"}="1">前往口說練習</button>`}
     <button id="finishBtn" class="check" ${spokenOK() ? "" : "disabled"} aria-label="已複習完成">${CHECK}</button>
     <div id="pinBox" hidden>
       <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="請輸入密碼">
@@ -67,6 +74,22 @@ const finishHTML = () => `
     </div>
     <p id="pinMsg"></p>
   </div>`;
+
+function speakSection(title, hanzi, pinyin, say, kind) {
+  const ok = spokenOK();
+  return `<h2>${title}</h2>
+    <p class="body">按下麥克風，大聲唸出這個${kind}。</p>
+    <div class="hero">
+      <div class="hanzi" style="font-size:${hanzi.length > 2 ? 64 : 104}px">${escHTML(hanzi)}</div>
+      <div class="py big">${escHTML(pinyin || "")}</div>
+      <div class="listen">${speakBtn(escHTML(say))}<span>先聽一次</span></div>
+    </div>
+    <div class="finish">
+      <button id="micBtn" class="mic ${ok ? "ok" : ""}" aria-label="麥克風">${MIC}</button>
+      <p id="micMsg">${ok ? "答對了！發音正確。" : "按下麥克風開始"}</p>
+      <p id="heard" class="py"></p>
+    </div>`;
+}
 
 function speak(text) {
   speechSynthesis.cancel();
@@ -155,21 +178,7 @@ function sectionHTML(id, d, title) {
           <div class="listen">${speakBtn(d.pronunciation)}<span>發音</span></div>
         </div>
         <div class="note"><small>意思</small><p>${d.meaning}</p></div>`;
-    case "speak": {
-      const ok = spokenOK();
-      return `<h2>${title}</h2>
-        <p class="body">按下麥克風，大聲唸出這個單字。</p>
-        <div class="hero">
-          <div class="hanzi">${d.character}</div>
-          <div class="py big">${d.pinyin}</div>
-          <div class="listen">${speakBtn(d.pronunciation)}<span>先聽一次</span></div>
-        </div>
-        <div class="finish">
-          <button id="micBtn" class="mic ${ok ? "ok" : ""}" aria-label="麥克風">${MIC}</button>
-          <p id="micMsg">${ok ? "答對了！發音正確。" : "按下麥克風開始"}</p>
-          <p id="heard" class="py"></p>
-        </div>`;
-    }
+    case "speak": return speakSection(title, d.character, d.pinyin, d.pronunciation, "單字");
     case "usage":       return `<h2>${title}</h2><p class="body">${d.usage}</p>`;
     case "examples":    return `<h2>${title}</h2>${d.examples.map(item).join("")}`;
     case "expressions": return `<h2>${title}</h2>${d.expressions.map(item).join("")}`;
@@ -235,11 +244,15 @@ document.addEventListener("click", e => {
   const go = e.target.closest("[data-go]");
   if (go) { setScreen(go.dataset.go); return; }
   if (e.target.closest("#homeBtn")) { setScreen("home"); return; }
-  const ph = e.target.closest("[data-phrase]");
-  if (ph) { curPhrase = phrases.find(p => p.code === ph.dataset.phrase); pTab = "info"; renderPhrases(); return; }
-  if (e.target.closest("[data-pback]")) { curPhrase = null; renderPhrases(); return; }
-  const pt = e.target.closest("[data-ptab]");
-  if (pt) { pTab = pt.dataset.ptab; renderPhrases(); return; }
+  const ps = e.target.closest("[data-pstep]");
+  if (ps) { pStep = Number(ps.dataset.pstep); renderPhrases(); return; }
+
+  // Flashcards: "I know" opens a box to type the word; the rest of the card flips it
+  const know = e.target.closest("[data-know]");
+  if (know) { openKnow(know.closest(".fc")); return; }
+  const knowOk = e.target.closest(".know-ok");
+  if (knowOk) { checkKnow(knowOk.closest(".fc")); return; }
+  if (e.target.closest(".know-in")) return;
   const fc = e.target.closest(".fc");
   if (fc) fc.classList.toggle("flipped");
 });
@@ -251,7 +264,8 @@ $("nextStep").onclick = () => {
 function showDone() {
   $("tabs").hidden = true;
   $("stepbar").hidden = true;
-  $("stage").textContent = "所有單字都學完了！請新增新的單字。";
+  stageMsg = "所有單字都學完了！請新增新的單字。";
+  $("stage").textContent = stageMsg;
 }
 
 // Big check: first ask for the PIN
@@ -267,8 +281,10 @@ async function submitPin() {
   const pin = $("pin").value.trim();
   if (!pin) { $("pinMsg").textContent = "請輸入密碼。"; return; }
 
+  const phr = inPhrases();
+  const code = phr ? curPhrase.code : word.code;
   $("pinBtn").disabled = true;
-  const { data, error } = await sb.rpc("complete_word", { p_code: word.code, p_pin: pin });
+  const { data, error } = await sb.rpc(phr ? "complete_phrase" : "complete_word", { p_code: code, p_pin: pin });
   $("pinBtn").disabled = false;
 
   if (error) { $("pinMsg").textContent = "無法儲存：" + error.message; return; }
@@ -281,6 +297,14 @@ async function submitPin() {
     return;
   }
   localStorage.removeItem("spoken");
+  if (phr) {
+    localStorage.removeItem("known:" + code);
+    if (!data.next) { showPhraseDone(); window.scrollTo(0, 0); return; }
+    curPhrase = await fetchPhrase(data.next);
+    pStep = 0;
+    renderPhrases();
+    return;
+  }
   if (!data.next) { showDone(); window.scrollTo(0, 0); return; }
   word = await fetchWord(data.next);
   step = 0;
@@ -288,7 +312,14 @@ async function submitPin() {
 }
 
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && e.target.id === "pin") submitPin();
+  if (e.key !== "Enter" || e.isComposing) return;
+  if (e.target.id === "pin") submitPin();
+  if (e.target.classList && e.target.classList.contains("know-in")) checkKnow(e.target.closest(".fc"));
+});
+
+// A red "try again" mark disappears when you type again in a flashcard
+document.addEventListener("input", e => {
+  if (e.target.classList && e.target.classList.contains("know-in")) e.target.classList.remove("bad");
 });
 
 /* ---------- Speaking practice (browser speech recognition) ---------- */
@@ -328,6 +359,8 @@ function setMic(state, msg, heard) {
 
 function startListening() {
   if (listening) return;
+  const t = currentTarget();
+  if (!t) return;
   if (!SR) {
     setMic("bad", "這個瀏覽器不支援語音辨識。請改用 Chrome（Android）或 Safari（iPhone）。");
     return;
@@ -346,8 +379,8 @@ function startListening() {
   rec.onresult = e => {
     gotResult = true;
     const alts = Array.from(e.results[0]).map(r => r.transcript);
-    if (isMatch(alts, word.character)) {
-      localStorage.setItem("spoken", word.code);
+    if (isMatch(alts, t.text)) {
+      localStorage.setItem("spoken", t.code);
       setMic("ok", "答對了！發音正確。", "聽到：" + alts[0]);
     } else {
       setMic("bad", "再試一次", "聽到：" + alts[0]);
@@ -865,45 +898,80 @@ $("pSaveBtn").onclick = async () => {
     return;
   }
   $("pStatus").textContent = "✅ 已儲存，編號 " + data;
+  if (!curPhrase) openPhrases();
   $("praw").value = "";
   $("pForm").innerHTML = "";
   $("pSaveBtn").hidden = true;
 };
 
 /* ---------- Screens: home / vocabulary / phrases ---------- */
-let phrases = [];
-let curPhrase = null;
-let pTab = "info";
+let curPhrase = null;   // the current phrase (stays until you confirm it with the PIN)
+let pStep = 0;
+let stageMsg = "";
 
 function setScreen(name) {
   document.body.dataset.screen = name;
-  if (name === "phrases") openPhrases();
+  // Only one lesson at a time stays in the page (the microphone and PIN elements use
+  // fixed ids), so the other one is emptied and drawn again when you come back
+  if (name === "phrases") {
+    $("stage").innerHTML = "";
+    $("tabs").innerHTML = "";
+    openPhrases();
+  } else {
+    $("pbody").innerHTML = "";
+    $("ptabs").innerHTML = "";
+    if (name === "vocab") {
+      if (word) render();
+      else if (stageMsg) $("stage").textContent = stageMsg;
+    }
+  }
   window.scrollTo(0, 0);
 }
 
+async function fetchPhrase(code) {
+  const { data, error } = await sb.from("phrases").select("*, phrase_vocab(*)").eq("code", code).single();
+  if (error) throw error;
+  data.phrase_vocab.sort((a, b) => a.num - b.num);
+  return data;
+}
+
+function showPhraseDone() {
+  curPhrase = null;
+  $("ptabs").hidden = true;
+  $("pstepbar").hidden = true;
+  $("pbody").textContent = "目前沒有可學習的成語（還沒新增，或全部都學完了）。請到頁面最下方的「管理」新增。";
+}
+
+// Same method as vocabulary: the database keeps the same phrase until it is confirmed
 async function openPhrases() {
   $("ptabs").hidden = true;
+  $("pstepbar").hidden = true;
   $("pbody").textContent = "載入中…";
   try {
-    const { data, error } = await sb.from("phrases").select("*, phrase_vocab(*)").order("study_order");
+    const { data: code, error } = await sb.rpc("get_current_phrase");
     if (error) throw error;
-    phrases = data;
+    if (!code) { showPhraseDone(); return; }
+    curPhrase = await fetchPhrase(code);
   } catch (err) {
     $("pbody").textContent = "無法載入成語：" + err.message;
     return;
   }
-  curPhrase = null;
+  pStep = 0;
   renderPhrases();
 }
 
 const zhRow = t => `<div class="item"><div class="row"><div class="zh">${escHTML(t)}</div>${speakBtn(escHTML(t))}</div></div>`;
+const storyParts = p => !p.story ? [] : p.story.includes("\n")
+  ? p.story.split("\n").filter(Boolean)                    // paragraphs, as pasted
+  : (p.story.match(/[^。]+。?/g) || [p.story]);             // old format: one row per sentence
 
-function listHTML() {
-  if (!phrases.length) return `<h2>成語</h2><p class="body">還沒有成語。請到頁面最下方的「管理」新增。</p>`;
-  return `<h2>成語</h2>` + phrases.map(p => `
-    <button class="plist" data-phrase="${escHTML(p.code)}">
-      <span class="zh">${escHTML(p.phrase)}</span><span class="py">${escHTML(p.pinyin || "")}</span>
-    </button>`).join("");
+function pSteps(p) {
+  const s = [{ id: "info", title: "成語" }, { id: "speak", title: "口說" }];
+  if (p.explanation_zh || p.explanation_en || p.example) s.push({ id: "explain", title: "解釋" });
+  if (p.phrase_vocab.length) s.push({ id: "vocab", title: "生詞" });
+  if (p.story) s.push({ id: "story", title: "故事" });
+  s.push({ id: "summary", title: "總結" }, { id: "confirm", title: "確認" });
+  return s;
 }
 
 function infoHTML(p) {
@@ -913,49 +981,128 @@ function infoHTML(p) {
       <div class="py big">${escHTML(p.pinyin || "")}</div>
       <div class="listen">${speakBtn(escHTML(p.phrase))}<span>發音</span></div>
     </div>
-    ${p.pos ? `<div class="note"><small>詞性</small><p>${escHTML(p.pos)}</p></div>` : ""}
-    ${p.explanation_zh || p.explanation_en ? `<section class="blk"><h3>解釋</h3>
-      ${p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : ""}
-      ${p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""}</section>` : ""}
+    ${p.pos ? `<div class="note"><small>詞性</small><p>${escHTML(p.pos)}</p></div>` : ""}`;
+}
+
+function explainHTML(p) {
+  return `<h2>解釋</h2>
+    ${p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : ""}
+    ${p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""}
     ${p.example ? `<section class="blk"><h3>例句</h3>${zhRow(p.example)}</section>` : ""}`;
 }
 
-// Numbered boxes: tap to flip and see the word, its pinyin and its meaning
+/* Flashcards: tap to flip; "我會了" asks you to type the word, and a correct word turns the card green */
+const knownKey = code => "known:" + code;
+const knownSet = code => {
+  try { return new Set(JSON.parse(localStorage.getItem(knownKey(code)) || "[]")); }
+  catch (e) { return new Set(); }
+};
+
 function vocabHTML(p) {
   const list = [...p.phrase_vocab].sort((a, b) => a.num - b.num);
   if (!list.length) return `<h2>生詞</h2><p class="body">這個成語還沒有生詞。</p>`;
-  return `<h2>生詞</h2><p class="py">點一下方塊翻面</p><div class="cards">` + list.map(v => `
-    <div class="fc"><div class="fc-in">
-      <div class="fc-front" style="font-size:${(v.word || "").length <= 2 ? 40 : (v.word || "").length <= 4 ? 32 : 24}px">${escHTML(v.word || v.num)}</div>
+  const known = knownSet(p.code);
+  const size = w => w.length <= 2 ? 40 : w.length <= 4 ? 32 : 24;
+  return `<h2>生詞</h2><p class="py">點一下方塊翻面。按「我會了」並打出這個詞，打對了方塊就會變綠色。</p><div class="cards">` +
+    list.map(v => {
+      const w = v.word || "";
+      const done = !!w && known.has(v.num);
+      return `
+    <div class="fc ${done ? "done" : ""}" data-num="${v.num}" data-word="${escHTML(w)}"><div class="fc-in">
+      <div class="fc-front">
+        <div class="fc-word" style="font-size:${size(w)}px">${escHTML(w || v.num)}</div>
+        ${w ? `<div class="fc-ctl">${done ? "✓" : `<button class="know" data-know="1">我會了</button>`}</div>` : ""}
+      </div>
       <div class="fc-back"><div class="fc-body">
-        <div class="zh">${escHTML(v.word || "")}</div>
+        <div class="zh">${escHTML(w)}</div>
         <div class="py">${escHTML(v.pinyin || "")}</div>
         <div class="fc-mean">${escHTML(v.meaning || "")}</div>
-        ${v.word ? speakBtn(escHTML(v.word)) : ""}
+        ${w ? speakBtn(escHTML(w)) : ""}
       </div></div>
-    </div></div>`).join("") + `</div>`;
+    </div></div>`;
+    }).join("") + `</div>`;
+}
+
+function openKnow(card) {
+  const ctl = card.querySelector(".fc-ctl");
+  ctl.innerHTML = `<input class="know-in" placeholder="輸入這個詞" autocomplete="off"><button class="know-ok">確認</button>`;
+  ctl.querySelector(".know-in").focus();
+}
+
+function checkKnow(card) {
+  const input = card.querySelector(".know-in");
+  if (!input) return;
+  if (input.value.trim().normalize("NFC") === card.dataset.word.normalize("NFC")) {
+    card.classList.add("done");
+    card.querySelector(".fc-ctl").textContent = "✓";
+    const set = knownSet(curPhrase.code);
+    set.add(Number(card.dataset.num));
+    localStorage.setItem(knownKey(curPhrase.code), JSON.stringify([...set]));
+  } else {
+    input.classList.add("bad");
+    input.value = "";
+    input.placeholder = "再試一次";
+  }
 }
 
 function storyHTML(p) {
   if (!p.story) return `<h2>故事</h2><p class="body">這個成語還沒有故事。</p>`;
-  const parts = p.story.includes("\n")
-    ? p.story.split("\n").filter(Boolean)                 // paragraphs, as pasted
-    : (p.story.match(/[^。]+。?/g) || [p.story]);          // old format: one row per sentence
   return `<h2>故事</h2>
     <button class="btn ghost" data-say="${escHTML(p.story)}">朗讀全文</button>
-    <div style="margin-top:14px">${parts.map(zhRow).join("")}</div>`;
+    <div style="margin-top:14px">${storyParts(p).map(zhRow).join("")}</div>`;
+}
+
+function phraseSummaryHTML(p) {
+  const block = (t, h) => h ? `<section class="blk"><h3>${t}</h3>${h}</section>` : "";
+  const words = p.phrase_vocab.map(v => `
+    <div class="item">
+      <div class="row"><div class="zh">${escHTML(v.word || "")}</div>${v.word ? speakBtn(escHTML(v.word)) : ""}</div>
+      <div class="py">${escHTML(v.pinyin || "")}</div>
+      <div>${escHTML(v.meaning || "")}</div>
+    </div>`).join("");
+  return `<h2>總結</h2>
+    <div class="hero small">
+      <div class="hanzi">${escHTML(p.phrase)}</div>
+      <div class="py big">${escHTML(p.pinyin || "")}</div>
+      ${speakBtn(escHTML(p.phrase))}
+    </div>
+    ${block("詞性", p.pos && `<p class="body">${escHTML(p.pos)}</p>`)}
+    ${block("解釋", (p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : "") +
+                    (p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""))}
+    ${block("例句", p.example && zhRow(p.example))}
+    ${block("生詞", words)}
+    ${block("故事", storyParts(p).map(zhRow).join(""))}`;
+}
+
+function phraseSection(id, p, title) {
+  switch (id) {
+    case "info":    return infoHTML(p);
+    case "speak":   return speakSection(title, p.phrase, p.pinyin, p.phrase, "成語");
+    case "explain": return explainHTML(p);
+    case "vocab":   return vocabHTML(p);
+    case "story":   return storyHTML(p);
+    case "confirm": return `<h2>${title}</h2>${finishHTML(true)}`;
+    default:        return phraseSummaryHTML(p);
+  }
 }
 
 function renderPhrases() {
-  const nav = $("ptabs");
-  if (!curPhrase) { nav.hidden = true; $("pbody").innerHTML = listHTML(); return; }
-  nav.hidden = false;
-  nav.innerHTML = `<button class="tab" data-pback="1">‹ 列表</button>` +
-    [["info", "成語"], ["vocab", "生詞"], ["story", "故事"]].map(([id, t]) =>
-      `<button class="tab ${pTab === id ? "active" : ""}" data-ptab="${id}">${t}</button>`).join("");
-  $("pbody").innerHTML = pTab === "info" ? infoHTML(curPhrase) : pTab === "vocab" ? vocabHTML(curPhrase) : storyHTML(curPhrase);
+  const steps = pSteps(curPhrase);
+  pStep = Math.min(pStep, steps.length - 1);
+  $("ptabs").hidden = false;
+  $("pstepbar").hidden = false;
+  $("ptabs").innerHTML = steps.map((s, i) =>
+    `<button class="tab ${i === pStep ? "active" : ""}" data-pstep="${i}">${s.title}</button>`).join("");
+  $("pbody").innerHTML = phraseSection(steps[pStep].id, curPhrase, steps[pStep].title);
+  $("pPrevStep").disabled = pStep === 0;
+  $("pNextStep").hidden = pStep === steps.length - 1;   // on the last step the big check takes over
   window.scrollTo(0, 0);
 }
+
+$("pNextStep").onclick = () => {
+  if (pStep < pSteps(curPhrase).length - 1) { pStep++; renderPhrases(); }
+};
+$("pPrevStep").onclick = () => { if (pStep > 0) { pStep--; renderPhrases(); } };
 
 /* ---------- Start ---------- */
 $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
@@ -971,6 +1118,7 @@ loadCurrent()
   .catch(err => {
     $("tabs").hidden = true;
     $("stepbar").hidden = true;
-    $("stage").textContent = "無法載入單字：" + err.message;
+    stageMsg = "無法載入單字：" + err.message;
+    $("stage").textContent = stageMsg;
   })
   .finally(() => { if (location.hash === "#admin") setAdmin(true); });
