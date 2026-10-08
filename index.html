@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body data-screen="home">
   <div id="app">
@@ -58,7 +58,7 @@
 
       <div class="card" id="addBox" hidden>
         <h2>新增單字</h2>
-        <textarea id="raw" rows="14" placeholder="貼上單字內容（Character、Pinyin、Meaning、Usage、Example、Common expressions related、Questions to practice）"></textarea>
+        <textarea id="raw" rows="14" placeholder="貼上一個或多個單字（每個單字都從 Character 開始，多個單字直接接著貼上）"></textarea>
         <button id="analyzeBtn" class="btn primary">分析</button>
         <div id="preview"></div>
         <button id="saveBtn" class="btn primary" hidden>儲存到資料庫</button>
@@ -81,9 +81,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=12"></script>
+  <script src="config.js?v=13"></script>
   <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

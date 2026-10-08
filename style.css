@@ -274,3 +274,16 @@ input.bad, textarea.bad {
 #preview details { background: var(--soft); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
 #preview summary { cursor: pointer; font-weight: 500; }
 .pv-bad { color: #d64545; margin: 0 0 8px; }
+
+/* ===== Articles ===== */
+.bigchoice.outline { background: var(--white); color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+#articles { display: none; }
+body[data-screen="articles"] #articles { display: block; }
+body[data-screen="articles"] #modes, body[data-screen="articles"] #tabs, body[data-screen="articles"] #stage,
+body[data-screen="articles"] #stepbar, body[data-screen="articles"] #reader { display: none !important; }
+.article-p { font-size: 18px; line-height: 1.9; }
+.article-p strong { background: var(--tint); border-radius: 4px; padding: 0 2px; }
+
+/* Admin: each screen only shows its own "add" form */
+body[data-screen="articles"] #addBox, body[data-screen="articles"] #phraseBox { display: none !important; }
+body:not([data-screen="articles"]) #articleBox { display: none !important; }

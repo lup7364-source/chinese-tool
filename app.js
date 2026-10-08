@@ -512,37 +512,77 @@ $("loginBtn").onclick = async () => {
 
 $("logoutBtn").onclick = async () => { await sb.auth.signOut(); refreshAdmin(); };
 
+// Several words can be pasted at once: every "Character" title starts a new word
+function splitWords(raw) {
+  const chunks = [];
+  let cur = null;
+  raw.replace(/\r/g, "").split("\n").forEach(l => {
+    const t = l.trim();
+    if (HEADERS.character.test(t.replace(/[:：]\s*$/, ""))) { cur = []; chunks.push(cur); }
+    else if (/^-{3,}$/.test(t)) return;                    // optional separator line
+    if (cur) cur.push(l);
+  });
+  return chunks.map(c => c.join("\n"));
+}
+
+let parsedList = [];
+
 $("analyzeBtn").onclick = () => {
-  $("adminStatus").textContent = "";
-  try {
-    parsed = parseWord($("raw").value);
-    $("preview").innerHTML = previewHTML(parsed);
-    $("saveBtn").hidden = false;
-  } catch (err) {
-    parsed = null;
+  const chunks = splitWords($("raw").value);
+  if (!chunks.length) {
+    parsedList = [];
     $("preview").innerHTML = "";
     $("saveBtn").hidden = true;
-    $("adminStatus").textContent = "❌ " + err.message;
+    $("adminStatus").textContent = "❌ 找不到 Character（單字）區塊。每個單字都要從 Character 這一行開始。";
+    return;
   }
+  const seen = new Set();
+  parsedList = chunks.map(chunk => {
+    try {
+      const w = parseWord(chunk);
+      if (seen.has(w.character)) throw new Error("這次貼上的內容裡重複了");
+      seen.add(w.character);
+      return { w };
+    } catch (err) {
+      const label = chunk.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 2).join(" ");
+      return { error: err.message, label };
+    }
+  });
+  const ok = parsedList.filter(x => x.w).length;
+  $("preview").innerHTML = parsedList.map((x, i) => x.w
+    ? `<details><summary>✅ ${escHTML(x.w.character)} · ${escHTML(x.w.pinyin)}</summary>${previewHTML(x.w)}</details>`
+    : `<p class="pv-bad">❌ 第 ${i + 1} 個（${escHTML(x.label)}）：${escHTML(x.error)}</p>`).join("");
+  $("saveBtn").textContent = `儲存 ${ok} 個單字`;
+  $("saveBtn").hidden = ok === 0;
+  $("adminStatus").textContent = `找到 ${parsedList.length} 個單字，${ok} 個可以儲存` +
+    (ok < parsedList.length ? "；有問題的會被略過（見紅字）。" : "。");
 };
 
 $("saveBtn").onclick = async () => {
-  if (!parsed) return;
+  const todo = parsedList.filter(x => x.w);
+  if (!todo.length) return;
   $("saveBtn").disabled = true;
-  const { data, error } = await sb.rpc("add_word", { p: parsed });
-  $("saveBtn").disabled = false;
-  if (error) {
-    $("adminStatus").textContent = /duplicate key/i.test(error.message)
-      ? "❌ 這個單字已經在資料庫裡了。"
-      : "❌ " + error.message;
-    return;
+  const lines = [];
+  let saved = 0;
+  for (let i = 0; i < todo.length; i++) {
+    $("adminStatus").textContent = `儲存中 ${i + 1} / ${todo.length}…`;
+    const w = todo[i].w;
+    const { data, error } = await sb.rpc("add_word", { p: w });
+    if (error) {
+      lines.push(`❌ ${w.character}：` + (/duplicate key/i.test(error.message) ? "已經在資料庫裡了"
+        : /not allowed/i.test(error.message) ? "沒有權限儲存" : error.message));
+    } else {
+      saved++;
+      lines.push(`✅ ${w.character} → ${data}`);
+    }
   }
-  // The current word stays on screen; the new word joins the pool of unreviewed words
-  $("adminStatus").textContent = "✅ 已儲存，編號 " + data + "。它會在之後隨機出現。";
-  $("raw").value = "";
-  $("preview").innerHTML = "";
+  $("saveBtn").disabled = false;
   $("saveBtn").hidden = true;
-  parsed = null;
+  $("preview").innerHTML = lines.map(l => `<p>${escHTML(l)}</p>`).join("");
+  // The current word stays on screen; new words join the pool of unreviewed words
+  $("adminStatus").textContent = `完成：已儲存 ${saved} 個，${todo.length - saved} 個沒有儲存。`;
+  parsedList = [];
+  if (saved === todo.length) $("raw").value = "";
 };
 
 /* ---------- Daily read (Chinese Reading Practice) ---------- */
@@ -827,15 +867,16 @@ function readPhraseForm() {
 }
 
 // Marks every problem field in red (with a short message) and returns how many there are
-const isZhOnly = s => /^[\u4e00-\u9fff]+$/.test(s);
-const isPinyin = s => /^[\p{Script=Latin}\p{M}\s'’-]+$/u.test(s);
+// A word or phrase only needs at least ONE Chinese character, so entries such as 照x光 or 把…給 are accepted
+const hasZhChar = s => /[\u4e00-\u9fff]/.test(s);
+const isPinyin = s => /^[\p{Script=Latin}\p{M}\s'’\-…·.,;\/()~、，]+$/u.test(s);
 
 function validatePhraseForm() {
   let bad = 0;
   const flag = (el, msg) => { el.classList.toggle("bad", !!msg); if (msg) bad++; };
 
   [
-    ["pf_phrase", v => !v ? "請填寫成語" : !isZhOnly(v) ? "成語只能是中文字" : ""],
+    ["pf_phrase", v => !v ? "請填寫成語" : !hasZhChar(v) ? "成語裡至少要有一個中文字" : ""],
     ["pf_pinyin", v => !v ? "請填寫拼音" : !isPinyin(v) ? "拼音只能有英文字母和聲調符號" : ""],
     ["pf_example", v => v ? "" : "請填寫例句"],
     ["pf_zh", v => v ? "" : "請填寫中文解釋"],
@@ -852,9 +893,9 @@ function validatePhraseForm() {
     const [w, p, m] = [".v-word", ".v-py", ".v-mean"].map(s => r.querySelector(s));
     const [vw, vp, vm] = [w, p, m].map(x => x.value.trim());
     const empty = !vw && !vp && !vm;
-    const wm = empty ? "" : !vw ? "缺少詞" : !isZhOnly(vw) ? "詞只能是中文字" : "";
+    const wm = empty ? "" : !vw ? "缺少詞" : !hasZhChar(vw) ? "詞裡至少要有一個中文字" : "";
     const pm = empty ? "" : !vp ? "缺少拼音" : !isPinyin(vp) ? "拼音格式不對" : "";
-    const mm = empty ? "" : !vm ? "缺少意思" : /[\u4e00-\u9fff]/.test(vm) ? "意思裡有中文字（可能是多餘的內容）" : "";
+    const mm = empty ? "" : !vm ? "缺少意思" : !/[A-Za-z]/.test(vm) ? "意思裡沒有英文（可能放錯欄位）" : "";
     flag(w, wm); flag(p, pm); flag(m, mm);
     r.querySelector(".vrow-err").textContent = [wm, pm, mm].filter(Boolean).join("；");
   });
