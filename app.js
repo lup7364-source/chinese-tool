@@ -93,9 +93,18 @@ function speakSection(title, hanzi, pinyin, say, kind) {
 
 function speak(text) {
   speechSynthesis.cancel();
-  const voice = new SpeechSynthesisUtterance(text);
-  voice.lang = "zh-TW";
-  speechSynthesis.speak(voice);
+  const sentences = String(text).match(/[^。！？\n]+[。！？]?/g) || [String(text)];
+  const parts = [];
+  let buf = "";
+  sentences.forEach(sn => {
+    if (buf && (buf + sn).length > 100) { parts.push(buf); buf = sn; } else buf += sn;
+  });
+  if (buf) parts.push(buf);
+  parts.forEach(part => {
+    const voice = new SpeechSynthesisUtterance(part);
+    voice.lang = "zh-TW";
+    speechSynthesis.speak(voice);
+  });
 }
 
 /* ---------- Section builders ---------- */
@@ -246,6 +255,10 @@ document.addEventListener("click", e => {
   if (e.target.closest("#homeBtn")) { setScreen("home"); return; }
   const ps = e.target.closest("[data-pstep]");
   if (ps) { pStep = Number(ps.dataset.pstep); renderPhrases(); return; }
+
+  const art = e.target.closest("[data-article]");
+  if (art) { curArticle = articles.find(a => a.code === art.dataset.article); renderArticles(); window.scrollTo(0, 0); return; }
+  if (e.target.closest("[data-aback]")) { curArticle = null; renderArticles(); window.scrollTo(0, 0); return; }
 
   // Flashcards: "I know" opens a box to type the word; the rest of the card flips it
   const know = e.target.closest("[data-know]");
@@ -485,6 +498,7 @@ async function refreshAdmin() {
   $("loginBox").hidden = !!data.session;
   $("addBox").hidden = !data.session;
   $("phraseBox").hidden = !data.session;
+  $("articleBox").hidden = !data.session;
   $("logoutBtn").hidden = !data.session;
 }
 
@@ -952,6 +966,7 @@ let stageMsg = "";
 
 function setScreen(name) {
   document.body.dataset.screen = name;
+  if (name === "articles") openArticles();
   // Only one lesson at a time stays in the page (the microphone and PIN elements use
   // fixed ids), so the other one is emptied and drawn again when you come back
   if (name === "phrases") {
@@ -1144,6 +1159,136 @@ $("pNextStep").onclick = () => {
   if (pStep < pSteps(curPhrase).length - 1) { pStep++; renderPhrases(); }
 };
 $("pPrevStep").onclick = () => { if (pStep > 0) { pStep--; renderPhrases(); } };
+
+/* ---------- Articles (readings you paste in yourself) ---------- */
+let articles = [];
+let curArticle = null;
+
+const plainText = t => String(t).replace(/\*\*/g, "");
+// **text** becomes bold; everything else is shown as plain, safe text
+const boldHTML = t => escHTML(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+const paragraphs = body => body.split("\n").map(x => x.trim()).filter(Boolean);
+
+async function openArticles() {
+  curArticle = null;
+  $("abody").textContent = "載入中…";
+  try {
+    const { data, error } = await sb.from("articles").select("*").order("study_order", { ascending: false });
+    if (error) throw error;
+    articles = data;
+  } catch (err) {
+    $("abody").textContent = "無法載入文章：" + err.message;
+    return;
+  }
+  renderArticles();
+}
+
+function renderArticles() {
+  if (curArticle) {
+    const paras = paragraphs(curArticle.body);
+    $("abody").innerHTML = `
+      <button class="btn ghost" data-aback="1">‹ 文章列表</button>
+      <h2 style="margin-top:14px">${escHTML(curArticle.title)}</h2>
+      <button class="btn ghost" data-say="${escHTML(plainText(paras.join("")))}">朗讀全文</button>
+      <div style="margin-top:14px">${paras.map(p => `
+        <div class="item"><div class="row"><div class="zh article-p">${boldHTML(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
+    return;
+  }
+  if (!articles.length) {
+    $("abody").innerHTML = `<h2>文章</h2><p class="body">還沒有文章。請到頁面最下方的「管理」新增。</p>`;
+    return;
+  }
+  $("abody").innerHTML = `<h2>文章</h2>` + articles.map(a => `
+    <button class="plist" data-article="${escHTML(a.code)}">
+      <span class="zh" style="font-size:18px">${escHTML(a.title)}</span><span class="py">${paragraphs(a.body).length} 段</span>
+    </button>`).join("");
+}
+
+// First line = title. If the title and the first paragraph arrived on the same line,
+// the title is cut before the first opening quotation mark.
+function parseArticle(raw) {
+  const lines = raw.replace(/\r/g, "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("沒有內容，請先貼上文章。");
+  const first = lines[0];
+  const clean = t => t.replace(/\*\*/g, "").trim();
+  let title, rest, guessed = false;
+  const tm = first.match(/^(?:#+\s*|(?:Title|標題)\s*[:：]\s*)(.+)$/i);
+  if (tm) { title = clean(tm[1]); rest = lines.slice(1); }
+  else if (first.length <= 40) { title = clean(first); rest = lines.slice(1); }
+  else {
+    guessed = true;
+    const q = first.search(/[「『“（(]/);
+    const cut = q > 0 && q <= 40 ? q : 20;
+    title = clean(first.slice(0, cut));
+    rest = [first.slice(cut).trim(), ...lines.slice(1)];
+  }
+  return { title, body: rest.join("\n"), guessed };
+}
+
+function articleFormHTML(a) {
+  return `<label class="lbl">標題</label>
+    <input id="af_title" value="${escHTML(a.title)}"><small class="err" data-err="af_title"></small>
+    <label class="lbl">內文（每一段一行；用 **文字** 可以顯示成粗體）</label>
+    <textarea id="af_body" rows="14">${escHTML(a.body)}</textarea><small class="err" data-err="af_body"></small>`;
+}
+
+function validateArticleForm() {
+  let bad = 0;
+  [
+    ["af_title", v => !v ? "請填寫標題" : !hasZh(v) ? "標題裡至少要有一個中文字" : v.length > 60 ? "標題太長了，可能把第一段也包進來了" : ""],
+    ["af_body", v => !v ? "請填寫內文" : !hasZh(v) ? "內文裡沒有中文字" : ""]
+  ].forEach(([id, rule]) => {
+    const el = $(id), msg = rule(el.value.trim());
+    el.classList.toggle("bad", !!msg);
+    if (msg) bad++;
+    document.querySelector(`[data-err="${id}"]`).textContent = msg;
+  });
+  const n = paragraphs($("af_body").value).length;
+  $("aStatus").textContent = bad
+    ? `❌ 有 ${bad} 個地方要修正（紅色欄位）。`
+    : `✅ 沒有發現問題（共 ${n} 段），可以按「儲存文章」。`;
+  return bad;
+}
+
+$("aForm").addEventListener("input", () => validateArticleForm());
+
+$("aAnalyzeBtn").onclick = () => {
+  try {
+    const a = parseArticle($("araw").value);
+    $("aForm").innerHTML = articleFormHTML(a);
+    $("aSaveBtn").hidden = false;
+    const bad = validateArticleForm();
+    if (a.guessed && !bad) $("aStatus").textContent += " 標題是自動判斷的，請確認標題是否正確。";
+  } catch (err) {
+    $("aForm").innerHTML = "";
+    $("aSaveBtn").hidden = true;
+    $("aStatus").textContent = "❌ " + err.message;
+  }
+};
+
+$("aSaveBtn").onclick = async () => {
+  if (validateArticleForm()) {
+    const first = document.querySelector("#aForm .bad");
+    if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  const article = { title: $("af_title").value.trim(), body: paragraphs($("af_body").value).join("\n") };
+  $("aSaveBtn").disabled = true;
+  const { data, error } = await sb.rpc("add_article", { p: article });
+  $("aSaveBtn").disabled = false;
+  if (error) {
+    $("aStatus").textContent =
+      /duplicate key/i.test(error.message) ? "❌ 已經有同樣標題的文章了。" :
+      /not allowed|permission/i.test(error.message) ? "❌ 沒有權限儲存，請確認你已經登入。" :
+      "❌ " + error.message;
+    return;
+  }
+  $("aStatus").textContent = "✅ 已儲存，編號 " + data;
+  $("araw").value = "";
+  $("aForm").innerHTML = "";
+  $("aSaveBtn").hidden = true;
+  openArticles();   // refresh the list so the new article appears
+};
 
 /* ---------- Start ---------- */
 $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
