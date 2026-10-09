@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body data-screen="home">
   <div id="app">
@@ -41,6 +41,7 @@
     <section id="phrases">
       <nav id="ptabs" hidden></nav>
       <main id="pbody" class="card">載入中…</main>
+      <button id="pEditBtn" class="btn ghost edit-btn" hidden>編輯這個成語</button>
       <div id="pstepbar" hidden>
         <button id="pPrevStep" class="btn ghost">上一步</button>
         <button id="pNextStep" class="btn primary">下一步</button>
@@ -71,20 +72,22 @@
       </div>
 
       <div class="card" id="phraseBox" hidden>
-        <h2>新增成語</h2>
+        <h2 id="pHead">新增成語</h2>
         <textarea id="praw" rows="10" placeholder="貼上成語頁面的內容（從【成語】開始，到生詞表結束）"></textarea>
         <button id="pAnalyzeBtn" class="btn primary">分析</button>
         <div id="pForm"></div>
         <button id="pSaveBtn" class="btn primary" hidden>儲存成語</button>
+        <button id="pCancelBtn" class="btn ghost" hidden>取消編輯</button>
         <p id="pStatus"></p>
       </div>
 
       <div class="card" id="articleBox" hidden>
-        <h2>新增文章</h2>
+        <h2 id="aHead">新增文章</h2>
         <textarea id="araw" rows="12" placeholder="貼上整篇文章（第一行是標題，下面是內文，每一段一行）"></textarea>
         <button id="aAnalyzeBtn" class="btn primary">分析</button>
         <div id="aForm"></div>
         <button id="aSaveBtn" class="btn primary" hidden>儲存文章</button>
+        <button id="aCancelBtn" class="btn ghost" hidden>取消編輯</button>
         <p id="aStatus"></p>
       </div>
 
@@ -94,10 +97,12 @@
     <footer><a href="#admin" id="adminToggle">管理</a></footer>
   </div>
 
+  <div id="lookup" hidden></div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=14"></script>
+  <script src="config.js?v=16"></script>
   <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

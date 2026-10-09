@@ -237,6 +237,10 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
+  if (!e.target.closest("#lookup") && !e.target.closest("[data-w]")) hideLookup();
+  if (e.target.closest("[data-lk-close]")) { hideLookup(); return; }
+  const wd = e.target.closest("[data-w]");
+  if (wd) { showLookup(wd.dataset.w); return; }
   const mode = e.target.closest("[data-mode]");
   if (mode) { setView(mode.dataset.mode); return; }
   if (e.target.closest("#micBtn")) { startListening(); return; }
@@ -256,6 +260,8 @@ document.addEventListener("click", e => {
   const ps = e.target.closest("[data-pstep]");
   if (ps) { pStep = Number(ps.dataset.pstep); renderPhrases(); return; }
 
+  if (e.target.closest("[data-aedit]")) { startEditArticle(); return; }
+  if (e.target.closest("[data-vadd]")) { addVocabRow(); return; }
   const art = e.target.closest("[data-article]");
   if (art) { curArticle = articles.find(a => a.code === art.dataset.article); renderArticles(); window.scrollTo(0, 0); return; }
   if (e.target.closest("[data-aback]")) { curArticle = null; renderArticles(); window.scrollTo(0, 0); return; }
@@ -500,6 +506,7 @@ async function refreshAdmin() {
   $("phraseBox").hidden = !data.session;
   $("articleBox").hidden = !data.session;
   $("logoutBtn").hidden = !data.session;
+  document.body.classList.toggle("admin", !!data.session);
 }
 
 // The same button opens and closes the admin area
@@ -596,6 +603,7 @@ $("saveBtn").onclick = async () => {
   // The current word stays on screen; new words join the pool of unreviewed words
   $("adminStatus").textContent = `完成：已儲存 ${saved} 個，${todo.length - saved} 個沒有儲存。`;
   parsedList = [];
+  lexPromise = null;   // the colored words will include the new words
   if (saved === todo.length) $("raw").value = "";
 };
 
@@ -684,10 +692,10 @@ function readHTML(post) {
   const title = tw(decodeHTML(post.title.rendered));
   const { vocab, zh, en } = parseLesson(post.content.rendered);
   const link = String(post.link).startsWith("https://chinesereadingpractice.com/") ? post.link : "https://chinesereadingpractice.com/";
-  const row = (text, pinyin, trans) => {
+  const row = (text, pinyin, trans, ann) => {
     const t = tw(text);
     return `<div class="item">
-      <div class="row"><div class="zh">${escHTML(t)}</div>${speakBtn(escHTML(t))}</div>
+      <div class="row"><div class="zh">${ann ? annotate(t) : escHTML(t)}</div>${speakBtn(escHTML(t))}</div>
       ${pinyin ? `<div class="py">${escHTML(pinyin)}</div>` : ""}
       ${trans ? `<div>${escHTML(trans)}</div>` : ""}
     </div>`;
@@ -696,7 +704,7 @@ function readHTML(post) {
     <h2>每日閱讀</h2>
     <h3 class="read-title">${escHTML(title)}</h3>
     ${vocab.length ? `<section class="blk"><h3>重點詞彙</h3>${vocab.map(v => row(v.zh, v.py, v.en)).join("")}</section>` : ""}
-    ${zh.length ? `<section class="blk"><h3>課文</h3>${zh.map(p => row(p)).join("")}</section>` : ""}
+    ${zh.length ? `<section class="blk"><h3>課文</h3>${legendHTML()}${zh.map(p => row(p, "", "", true)).join("")}</section>` : ""}
     ${en.length ? `<details class="blk"><summary>顯示英文翻譯</summary>${en.map(p => `<p class="body">${escHTML(p)}</p>`).join("")}</details>` : ""}
     <p class="source">來源：<a href="${escHTML(link)}" target="_blank" rel="noopener">Chinese Reading Practice</a>（作者 Kendra）。原文為簡體字，此處自動轉為繁體${toTw ? "" : "（轉換工具載入失敗，目前顯示簡體）"}。</p>`;
 }
@@ -705,7 +713,9 @@ async function loadRead() {
   const box = $("reader");
   box.textContent = "載入中…";
   try {
-    box.innerHTML = readHTML(await fetchDailyPost());
+    const post = await fetchDailyPost();
+    await loadLexicon();
+    box.innerHTML = readHTML(post);
     readLoaded = true;
   } catch (err) {
     box.innerHTML = `<h2>每日閱讀</h2>
@@ -859,11 +869,23 @@ function phraseFormHTML(p) {
     + fld("pf_example", "例句", p.example) + fld("pf_zh", "解釋（中文）", p.explanation_zh, true)
     + fld("pf_en", "解釋（英文）", p.explanation_en, true) + fld("pf_story", "故事", p.story, true)
     + `<label class="lbl">生詞（共 ${p.vocab.length} 個）：請檢查每一列。缺少的內容請補上，不要的列把三格清空。</label>`
-    + p.vocab.map(v => `<div class="vrow" data-num="${v.num}"><span class="vnum">${v.num}</span>
+    + p.vocab.map(v => vrowHTML(v)).join("")
+    + `<button class="btn ghost" data-vadd="1">＋ 新增一列生詞</button>`;
+}
+
+const vrowHTML = v => `<div class="vrow" data-num="${v.num}"><span class="vnum">${v.num}</span>
         <input class="v-word" value="${escHTML(v.word)}" placeholder="詞">
         <input class="v-py" value="${escHTML(v.pinyin)}" placeholder="拼音">
         <input class="v-mean" value="${escHTML(v.meaning)}" placeholder="意思">
-        <small class="err vrow-err"></small></div>`).join("");
+        <small class="err vrow-err"></small></div>`;
+
+function addVocabRow() {
+  const btn = document.querySelector("#pForm [data-vadd]");
+  if (!btn) return;
+  const nums = [...document.querySelectorAll("#pForm .vrow")].map(r => Number(r.dataset.num));
+  btn.insertAdjacentHTML("beforebegin", vrowHTML({ num: Math.max(0, ...nums) + 1, word: "", pinyin: "", meaning: "" }));
+  const rows = document.querySelectorAll("#pForm .vrow");
+  rows[rows.length - 1].querySelector(".v-word").focus();
 }
 
 function readPhraseForm() {
@@ -935,6 +957,42 @@ $("pAnalyzeBtn").onclick = () => {
   }
 };
 
+let editingPhrase = null;   // code of the phrase being edited (null = adding a new one)
+
+function resetPhraseCard() {
+  editingPhrase = null;
+  $("pHead").textContent = "新增成語";
+  $("pSaveBtn").textContent = "儲存成語";
+  $("pSaveBtn").hidden = true;
+  $("pCancelBtn").hidden = true;
+  $("pForm").innerHTML = "";
+  $("pStatus").textContent = "";
+}
+
+async function startEditPhrase() {
+  const p = curPhrase;
+  if (!p) return;
+  editingPhrase = p.code;
+  setAdmin(true);
+  await refreshAdmin();
+  $("pHead").textContent = "編輯成語";
+  $("praw").value = "";
+  $("pForm").innerHTML = phraseFormHTML({
+    phrase: p.phrase, pinyin: p.pinyin || "", pos: p.pos || "", example: p.example || "",
+    explanation_zh: p.explanation_zh || "", explanation_en: p.explanation_en || "", story: p.story || "",
+    vocab: p.phrase_vocab.map(v => ({ num: v.num, word: v.word || "", pinyin: v.pinyin || "", meaning: v.meaning || "" }))
+  });
+  $("pSaveBtn").textContent = "儲存修改";
+  $("pSaveBtn").hidden = false;
+  $("pCancelBtn").hidden = false;
+  validatePhraseForm();
+  $("pStatus").textContent = `正在編輯「${p.phrase}」。` + $("pStatus").textContent;
+  $("phraseBox").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("pEditBtn").onclick = () => startEditPhrase();
+$("pCancelBtn").onclick = () => resetPhraseCard();
+
 $("pSaveBtn").onclick = async () => {
   if (validatePhraseForm()) {
     const first = document.querySelector("#pForm .bad");
@@ -943,13 +1001,24 @@ $("pSaveBtn").onclick = async () => {
   }
   const obj = readPhraseForm();
   $("pSaveBtn").disabled = true;
-  const { data, error } = await sb.rpc("add_phrase", { p: obj });
+  const editing = editingPhrase;
+  const { data, error } = editing
+    ? await sb.rpc("update_phrase", { p_code: editing, p: obj })
+    : await sb.rpc("add_phrase", { p: obj });
   $("pSaveBtn").disabled = false;
   if (error) {
     $("pStatus").textContent =
       /duplicate key/i.test(error.message) ? "❌ 這個成語已經存在。" :
       /not allowed/i.test(error.message) ? "❌ 沒有權限儲存：資料庫不認得這個登入帳號。請在 Supabase 執行 fix-phrases.sql。" :
       "❌ " + error.message;
+    return;
+  }
+  lexPromise = null;
+  if (editing) {
+    resetPhraseCard();
+    $("pStatus").textContent = "✅ 已儲存修改";
+    try { curPhrase = await fetchPhrase(editing); renderPhrases(); }
+    catch (err) { $("pStatus").textContent += "（但重新載入失敗：" + err.message + "）"; }
     return;
   }
   $("pStatus").textContent = "✅ 已儲存，編號 " + data;
@@ -993,6 +1062,7 @@ async function fetchPhrase(code) {
 
 function showPhraseDone() {
   curPhrase = null;
+  $("pEditBtn").hidden = true;
   $("ptabs").hidden = true;
   $("pstepbar").hidden = true;
   $("pbody").textContent = "目前沒有可學習的成語（還沒新增，或全部都學完了）。請到頁面最下方的「管理」新增。";
@@ -1000,6 +1070,7 @@ function showPhraseDone() {
 
 // Same method as vocabulary: the database keeps the same phrase until it is confirmed
 async function openPhrases() {
+  $("pEditBtn").hidden = true;
   $("ptabs").hidden = true;
   $("pstepbar").hidden = true;
   $("pbody").textContent = "載入中…";
@@ -1008,6 +1079,7 @@ async function openPhrases() {
     if (error) throw error;
     if (!code) { showPhraseDone(); return; }
     curPhrase = await fetchPhrase(code);
+    await loadLexicon();
   } catch (err) {
     $("pbody").textContent = "無法載入成語：" + err.message;
     return;
@@ -1042,9 +1114,10 @@ function infoHTML(p) {
 
 function explainHTML(p) {
   return `<h2>解釋</h2>
-    ${p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : ""}
+    ${legendHTML()}
+    ${p.explanation_zh ? `<p class="body">${annotate(p.explanation_zh)}</p>` : ""}
     ${p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""}
-    ${p.example ? `<section class="blk"><h3>例句</h3>${zhRow(p.example)}</section>` : ""}`;
+    ${p.example ? `<section class="blk"><h3>例句</h3>${zhRowA(p.example)}</section>` : ""}`;
 }
 
 /* Flashcards: tap to flip; "我會了" asks you to type the word, and a correct word turns the card green */
@@ -1105,7 +1178,8 @@ function storyHTML(p) {
   if (!p.story) return `<h2>故事</h2><p class="body">這個成語還沒有故事。</p>`;
   return `<h2>故事</h2>
     <button class="btn ghost" data-say="${escHTML(p.story)}">朗讀全文</button>
-    <div style="margin-top:14px">${storyParts(p).map(zhRow).join("")}</div>`;
+    ${legendHTML()}
+    <div style="margin-top:14px">${storyParts(p).map(zhRowA).join("")}</div>`;
 }
 
 function phraseSummaryHTML(p) {
@@ -1123,11 +1197,12 @@ function phraseSummaryHTML(p) {
       ${speakBtn(escHTML(p.phrase))}
     </div>
     ${block("詞性", p.pos && `<p class="body">${escHTML(p.pos)}</p>`)}
-    ${block("解釋", (p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : "") +
+    ${legendHTML()}
+    ${block("解釋", (p.explanation_zh ? `<p class="body">${annotate(p.explanation_zh)}</p>` : "") +
                     (p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""))}
-    ${block("例句", p.example && zhRow(p.example))}
+    ${block("例句", p.example && zhRowA(p.example))}
     ${block("生詞", words)}
-    ${block("故事", storyParts(p).map(zhRow).join(""))}`;
+    ${block("故事", storyParts(p).map(zhRowA).join(""))}`;
 }
 
 function phraseSection(id, p, title) {
@@ -1147,6 +1222,7 @@ function renderPhrases() {
   pStep = Math.min(pStep, steps.length - 1);
   $("ptabs").hidden = false;
   $("pstepbar").hidden = false;
+  $("pEditBtn").hidden = false;
   $("ptabs").innerHTML = steps.map((s, i) =>
     `<button class="tab ${i === pStep ? "active" : ""}" data-pstep="${i}">${s.title}</button>`).join("");
   $("pbody").innerHTML = phraseSection(steps[pStep].id, curPhrase, steps[pStep].title);
@@ -1159,6 +1235,139 @@ $("pNextStep").onclick = () => {
   if (pStep < pSteps(curPhrase).length - 1) { pStep++; renderPhrases(); }
 };
 $("pPrevStep").onclick = () => { if (pStep > 0) { pStep--; renderPhrases(); } };
+
+/* ---------- Word lookup: click a word for pinyin + meaning, unknown words in color ---------- */
+let lex = new Map();     // every word, phrase and expression that is in your database
+let lexMax = 1;
+let lexOk = false;
+let lexPromise = null;
+
+async function fetchAll(table, cols) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from(table).select(cols).range(from, from + 999);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 1000) break;
+  }
+  return rows;
+}
+
+function loadLexicon() {
+  if (lexPromise) return lexPromise;
+  lexPromise = (async () => {
+    try {
+      const [w, pv, ph, ex] = await Promise.all([
+        fetchAll("words", "hanzi,pinyin,meaning"),
+        fetchAll("phrase_vocab", "word,pinyin,meaning"),
+        fetchAll("phrases", "phrase,pinyin,explanation_en"),
+        fetchAll("expressions", "zh,pinyin,en")
+      ]);
+      const m = new Map();
+      const add = (k, pinyin, meaning) => {
+        k = (k || "").trim();
+        if (k && hasZh(k) && !m.has(k)) m.set(k, { pinyin: pinyin || "", meaning: meaning || "" });
+      };
+      w.forEach(r => add(r.hanzi, r.pinyin, r.meaning));
+      pv.forEach(r => add(r.word, r.pinyin, r.meaning));
+      ph.forEach(r => add(r.phrase, r.pinyin, r.explanation_en));
+      ex.forEach(r => add(r.zh, r.pinyin, r.en));
+      lex = m;
+      lexMax = Math.max(1, ...[...m.keys()].map(k => k.length));
+      lexOk = true;
+    } catch (err) {
+      lexOk = false;      // colors are switched off, clicking still works
+    }
+  })();
+  return lexPromise;
+}
+
+// Very common words are never painted, so the color only points at words worth checking
+const COMMON = new Set(("的 了 是 在 我 你 他 她 它 們 這 那 有 和 與 也 都 就 不 沒 很 會 能 可 以 為 而 但 及 或 把 被 對 從 到 說 要 嗎 呢 吧 啊 之 其 等 於 個 一 二 三 四 五 六 七 八 九 十 上 下 中 大 小 多 少 好 來 去 人 又 還 才 只 想 看 做 讓 給 跟 向 由 如 若 則 並 且 所 已 曾 將 著 過 地 得 " +
+  "我們 你們 他們 她們 自己 因為 所以 但是 如果 可以 沒有 什麼 這個 那個 一個 已經 還是 或是 以及 以後 以前 因此 然而 不過 而且 雖然 可是 一些 這樣 那樣 這些 那些 怎麼 為什麼 時候 現在 今天 明天 昨天 知道 覺得 需要 應該 可能 不是 就是 也是 都是 一樣 一起 一定 非常 比較 每個").split(" "));
+
+const segmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("zh", { granularity: "word" }) : null;
+
+// Inside a chunk that is not a known word, still pick out your own multi-character words
+function classify(t) {
+  if (lex.has(t)) return [{ t, k: "known" }];
+  if (COMMON.has(t)) return [{ t, k: "common" }];
+  const res = [];
+  let rest = "", i = 0;
+  const flush = () => { if (rest) { res.push({ t: rest, k: COMMON.has(rest) ? "common" : "unk" }); rest = ""; } };
+  while (i < t.length) {
+    let hit = "";
+    for (let L = Math.min(lexMax, t.length - i); L >= 2; L--) {
+      const c = t.substr(i, L);
+      if (lex.has(c)) { hit = c; break; }
+    }
+    if (hit) { flush(); res.push({ t: hit, k: "known" }); i += hit.length; }
+    else { rest += t[i]; i++; }
+  }
+  flush();
+  return res;
+}
+
+function tokens(text) {
+  const pieces = segmenter
+    ? [...segmenter.segment(text)].map(x => x.segment)
+    : (text.match(/[\u4e00-\u9fff]+|[^\u4e00-\u9fff]+/g) || []);
+  const out = [];
+  pieces.forEach(t => {
+    if (!hasZh(t)) out.push({ t, k: "x" });
+    else out.push(...classify(t));
+  });
+  return out;
+}
+
+// Text with every word clickable; words that are NOT in your database get the color
+function annotate(text) {
+  return tokens(String(text ?? "")).map(x => x.k === "x" ? escHTML(x.t)
+    : `<span class="w ${lexOk ? x.k : "common"}" data-w="${escHTML(x.t)}">${escHTML(x.t)}</span>`).join("");
+}
+const annotateBold = text => String(text).split("**")
+  .map((seg, i) => i % 2 ? `<strong>${annotate(seg)}</strong>` : annotate(seg)).join("");
+const zhRowA = t => `<div class="item"><div class="row"><div class="zh">${annotate(t)}</div>${speakBtn(escHTML(t))}</div></div>`;
+const legendHTML = () => lexOk
+  ? `<p class="legend"><span class="lg-unk">橘色</span> ＝ 資料庫裡沒有的詞。點一下任何詞，可以看拼音和意思。</p>`
+  : `<p class="legend">點一下任何詞，可以看拼音和意思。</p>`;
+
+async function translateWord(w) {
+  const key = "lookup:" + w;
+  const cached = localStorage.getItem(key);
+  if (cached) return cached;
+  try {
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(w)}&langpair=zh-TW|en`);
+    const j = await r.json();
+    const t = (j.responseData && j.responseData.translatedText) || "";
+    if (!t || /MYMEMORY WARNING|INVALID|QUERY LENGTH/i.test(t)) return "";
+    localStorage.setItem(key, t);
+    return t;
+  } catch (err) { return ""; }
+}
+
+let lookupWord = "";
+function hideLookup() { lookupWord = ""; $("lookup").hidden = true; }
+
+async function showLookup(w) {
+  lookupWord = w;
+  const info = lex.get(w);
+  const py = (info && info.pinyin) || (typeof pinyinPro !== "undefined" ? pinyinPro.pinyin(w, { toneType: "symbol" }) : "");
+  const gt = `https://translate.google.com/?sl=zh-TW&tl=en&text=${encodeURIComponent(w)}&op=translate`;
+  const box = $("lookup");
+  box.hidden = false;
+  box.innerHTML = `
+    <button class="lk-x" data-lk-close="1" aria-label="關閉">×</button>
+    <div class="lk-row"><span class="lk-w">${escHTML(w)}</span>${speakBtn(escHTML(w))}</div>
+    <div class="lk-py">${escHTML(py)}</div>
+    <div class="lk-mean" id="lkMean">${info && info.meaning ? escHTML(info.meaning) : "查詢中…"}</div>
+    <div class="lk-foot">${info ? "<span class='lk-tag'>資料庫裡有</span>" : "<span class='lk-tag unk'>資料庫裡沒有</span>"}
+      <a href="${gt}" target="_blank" rel="noopener">在 Google 翻譯開啟</a></div>`;
+  if (info && info.meaning) return;
+  const m = await translateWord(w);
+  const el = $("lkMean");
+  if (lookupWord === w && el) el.textContent = m ? m + "（機器翻譯，僅供參考）" : "暫時查不到意思，可以用下面的連結查詢。";
+}
 
 /* ---------- Articles (readings you paste in yourself) ---------- */
 let articles = [];
@@ -1176,6 +1385,7 @@ async function openArticles() {
     const { data, error } = await sb.from("articles").select("*").order("study_order", { ascending: false });
     if (error) throw error;
     articles = data;
+    await loadLexicon();
   } catch (err) {
     $("abody").textContent = "無法載入文章：" + err.message;
     return;
@@ -1190,8 +1400,10 @@ function renderArticles() {
       <button class="btn ghost" data-aback="1">‹ 文章列表</button>
       <h2 style="margin-top:14px">${escHTML(curArticle.title)}</h2>
       <button class="btn ghost" data-say="${escHTML(plainText(paras.join("")))}">朗讀全文</button>
+      <button class="btn ghost edit-btn" data-aedit="1">編輯這篇文章</button>
+      ${legendHTML()}
       <div style="margin-top:14px">${paras.map(p => `
-        <div class="item"><div class="row"><div class="zh article-p">${boldHTML(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
+        <div class="item"><div class="row"><div class="zh article-p">${annotateBold(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
     return;
   }
   if (!articles.length) {
@@ -1266,6 +1478,37 @@ $("aAnalyzeBtn").onclick = () => {
   }
 };
 
+let editingArticle = null;   // code of the article being edited (null = adding a new one)
+
+function resetArticleCard() {
+  editingArticle = null;
+  $("aHead").textContent = "新增文章";
+  $("aSaveBtn").textContent = "儲存文章";
+  $("aSaveBtn").hidden = true;
+  $("aCancelBtn").hidden = true;
+  $("aForm").innerHTML = "";
+  $("aStatus").textContent = "";
+}
+
+async function startEditArticle() {
+  const a = curArticle;
+  if (!a) return;
+  editingArticle = a.code;
+  setAdmin(true);
+  await refreshAdmin();
+  $("aHead").textContent = "編輯文章";
+  $("araw").value = "";
+  $("aForm").innerHTML = articleFormHTML({ title: a.title, body: a.body });
+  $("aSaveBtn").textContent = "儲存修改";
+  $("aSaveBtn").hidden = false;
+  $("aCancelBtn").hidden = false;
+  validateArticleForm();
+  $("aStatus").textContent = `正在編輯「${a.title}」。` + $("aStatus").textContent;
+  $("articleBox").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("aCancelBtn").onclick = () => resetArticleCard();
+
 $("aSaveBtn").onclick = async () => {
   if (validateArticleForm()) {
     const first = document.querySelector("#aForm .bad");
@@ -1274,13 +1517,24 @@ $("aSaveBtn").onclick = async () => {
   }
   const article = { title: $("af_title").value.trim(), body: paragraphs($("af_body").value).join("\n") };
   $("aSaveBtn").disabled = true;
-  const { data, error } = await sb.rpc("add_article", { p: article });
+  const editing = editingArticle;
+  const { data, error } = editing
+    ? await sb.rpc("update_article", { p_code: editing, p: article })
+    : await sb.rpc("add_article", { p: article });
   $("aSaveBtn").disabled = false;
   if (error) {
     $("aStatus").textContent =
       /duplicate key/i.test(error.message) ? "❌ 已經有同樣標題的文章了。" :
       /not allowed|permission/i.test(error.message) ? "❌ 沒有權限儲存，請確認你已經登入。" :
       "❌ " + error.message;
+    return;
+  }
+  if (editing) {
+    const a = articles.find(x => x.code === editing);
+    if (a) { a.title = article.title; a.body = article.body; }   // curArticle is this same object
+    resetArticleCard();
+    $("aStatus").textContent = "✅ 已儲存修改";
+    renderArticles();
     return;
   }
   $("aStatus").textContent = "✅ 已儲存，編號 " + data;
@@ -1291,6 +1545,10 @@ $("aSaveBtn").onclick = async () => {
 };
 
 /* ---------- Start ---------- */
+// The edit buttons are only visible while you are logged in
+sb.auth.onAuthStateChange((_event, session) => document.body.classList.toggle("admin", !!session));
+sb.auth.getSession().then(({ data }) => document.body.classList.toggle("admin", !!data.session));
+
 $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
   month: "long", day: "numeric", weekday: "long"
 });
