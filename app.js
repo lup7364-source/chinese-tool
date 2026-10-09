@@ -237,6 +237,10 @@ function checkAnswer(btn) {
 
 /* ---------- Events ---------- */
 document.addEventListener("click", e => {
+  if (!e.target.closest("#lookup") && !e.target.closest("[data-w]")) hideLookup();
+  if (e.target.closest("[data-lk-close]")) { hideLookup(); return; }
+  const wd = e.target.closest("[data-w]");
+  if (wd) { showLookup(wd.dataset.w); return; }
   const mode = e.target.closest("[data-mode]");
   if (mode) { setView(mode.dataset.mode); return; }
   if (e.target.closest("#micBtn")) { startListening(); return; }
@@ -596,6 +600,7 @@ $("saveBtn").onclick = async () => {
   // The current word stays on screen; new words join the pool of unreviewed words
   $("adminStatus").textContent = `完成：已儲存 ${saved} 個，${todo.length - saved} 個沒有儲存。`;
   parsedList = [];
+  lexPromise = null;   // the colored words will include the new words
   if (saved === todo.length) $("raw").value = "";
 };
 
@@ -684,10 +689,10 @@ function readHTML(post) {
   const title = tw(decodeHTML(post.title.rendered));
   const { vocab, zh, en } = parseLesson(post.content.rendered);
   const link = String(post.link).startsWith("https://chinesereadingpractice.com/") ? post.link : "https://chinesereadingpractice.com/";
-  const row = (text, pinyin, trans) => {
+  const row = (text, pinyin, trans, ann) => {
     const t = tw(text);
     return `<div class="item">
-      <div class="row"><div class="zh">${escHTML(t)}</div>${speakBtn(escHTML(t))}</div>
+      <div class="row"><div class="zh">${ann ? annotate(t) : escHTML(t)}</div>${speakBtn(escHTML(t))}</div>
       ${pinyin ? `<div class="py">${escHTML(pinyin)}</div>` : ""}
       ${trans ? `<div>${escHTML(trans)}</div>` : ""}
     </div>`;
@@ -696,7 +701,7 @@ function readHTML(post) {
     <h2>每日閱讀</h2>
     <h3 class="read-title">${escHTML(title)}</h3>
     ${vocab.length ? `<section class="blk"><h3>重點詞彙</h3>${vocab.map(v => row(v.zh, v.py, v.en)).join("")}</section>` : ""}
-    ${zh.length ? `<section class="blk"><h3>課文</h3>${zh.map(p => row(p)).join("")}</section>` : ""}
+    ${zh.length ? `<section class="blk"><h3>課文</h3>${legendHTML()}${zh.map(p => row(p, "", "", true)).join("")}</section>` : ""}
     ${en.length ? `<details class="blk"><summary>顯示英文翻譯</summary>${en.map(p => `<p class="body">${escHTML(p)}</p>`).join("")}</details>` : ""}
     <p class="source">來源：<a href="${escHTML(link)}" target="_blank" rel="noopener">Chinese Reading Practice</a>（作者 Kendra）。原文為簡體字，此處自動轉為繁體${toTw ? "" : "（轉換工具載入失敗，目前顯示簡體）"}。</p>`;
 }
@@ -705,7 +710,9 @@ async function loadRead() {
   const box = $("reader");
   box.textContent = "載入中…";
   try {
-    box.innerHTML = readHTML(await fetchDailyPost());
+    const post = await fetchDailyPost();
+    await loadLexicon();
+    box.innerHTML = readHTML(post);
     readLoaded = true;
   } catch (err) {
     box.innerHTML = `<h2>每日閱讀</h2>
@@ -953,6 +960,7 @@ $("pSaveBtn").onclick = async () => {
     return;
   }
   $("pStatus").textContent = "✅ 已儲存，編號 " + data;
+  lexPromise = null;
   if (!curPhrase) openPhrases();
   $("praw").value = "";
   $("pForm").innerHTML = "";
@@ -1008,6 +1016,7 @@ async function openPhrases() {
     if (error) throw error;
     if (!code) { showPhraseDone(); return; }
     curPhrase = await fetchPhrase(code);
+    await loadLexicon();
   } catch (err) {
     $("pbody").textContent = "無法載入成語：" + err.message;
     return;
@@ -1042,9 +1051,10 @@ function infoHTML(p) {
 
 function explainHTML(p) {
   return `<h2>解釋</h2>
-    ${p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : ""}
+    ${legendHTML()}
+    ${p.explanation_zh ? `<p class="body">${annotate(p.explanation_zh)}</p>` : ""}
     ${p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""}
-    ${p.example ? `<section class="blk"><h3>例句</h3>${zhRow(p.example)}</section>` : ""}`;
+    ${p.example ? `<section class="blk"><h3>例句</h3>${zhRowA(p.example)}</section>` : ""}`;
 }
 
 /* Flashcards: tap to flip; "我會了" asks you to type the word, and a correct word turns the card green */
@@ -1105,7 +1115,8 @@ function storyHTML(p) {
   if (!p.story) return `<h2>故事</h2><p class="body">這個成語還沒有故事。</p>`;
   return `<h2>故事</h2>
     <button class="btn ghost" data-say="${escHTML(p.story)}">朗讀全文</button>
-    <div style="margin-top:14px">${storyParts(p).map(zhRow).join("")}</div>`;
+    ${legendHTML()}
+    <div style="margin-top:14px">${storyParts(p).map(zhRowA).join("")}</div>`;
 }
 
 function phraseSummaryHTML(p) {
@@ -1123,11 +1134,12 @@ function phraseSummaryHTML(p) {
       ${speakBtn(escHTML(p.phrase))}
     </div>
     ${block("詞性", p.pos && `<p class="body">${escHTML(p.pos)}</p>`)}
-    ${block("解釋", (p.explanation_zh ? `<p class="body">${escHTML(p.explanation_zh)}</p>` : "") +
+    ${legendHTML()}
+    ${block("解釋", (p.explanation_zh ? `<p class="body">${annotate(p.explanation_zh)}</p>` : "") +
                     (p.explanation_en ? `<p class="py">${escHTML(p.explanation_en)}</p>` : ""))}
-    ${block("例句", p.example && zhRow(p.example))}
+    ${block("例句", p.example && zhRowA(p.example))}
     ${block("生詞", words)}
-    ${block("故事", storyParts(p).map(zhRow).join(""))}`;
+    ${block("故事", storyParts(p).map(zhRowA).join(""))}`;
 }
 
 function phraseSection(id, p, title) {
@@ -1160,6 +1172,139 @@ $("pNextStep").onclick = () => {
 };
 $("pPrevStep").onclick = () => { if (pStep > 0) { pStep--; renderPhrases(); } };
 
+/* ---------- Word lookup: click a word for pinyin + meaning, unknown words in color ---------- */
+let lex = new Map();     // every word, phrase and expression that is in your database
+let lexMax = 1;
+let lexOk = false;
+let lexPromise = null;
+
+async function fetchAll(table, cols) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from(table).select(cols).range(from, from + 999);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 1000) break;
+  }
+  return rows;
+}
+
+function loadLexicon() {
+  if (lexPromise) return lexPromise;
+  lexPromise = (async () => {
+    try {
+      const [w, pv, ph, ex] = await Promise.all([
+        fetchAll("words", "hanzi,pinyin,meaning"),
+        fetchAll("phrase_vocab", "word,pinyin,meaning"),
+        fetchAll("phrases", "phrase,pinyin,explanation_en"),
+        fetchAll("expressions", "zh,pinyin,en")
+      ]);
+      const m = new Map();
+      const add = (k, pinyin, meaning) => {
+        k = (k || "").trim();
+        if (k && hasZh(k) && !m.has(k)) m.set(k, { pinyin: pinyin || "", meaning: meaning || "" });
+      };
+      w.forEach(r => add(r.hanzi, r.pinyin, r.meaning));
+      pv.forEach(r => add(r.word, r.pinyin, r.meaning));
+      ph.forEach(r => add(r.phrase, r.pinyin, r.explanation_en));
+      ex.forEach(r => add(r.zh, r.pinyin, r.en));
+      lex = m;
+      lexMax = Math.max(1, ...[...m.keys()].map(k => k.length));
+      lexOk = true;
+    } catch (err) {
+      lexOk = false;      // colors are switched off, clicking still works
+    }
+  })();
+  return lexPromise;
+}
+
+// Very common words are never painted, so the color only points at words worth checking
+const COMMON = new Set(("的 了 是 在 我 你 他 她 它 們 這 那 有 和 與 也 都 就 不 沒 很 會 能 可 以 為 而 但 及 或 把 被 對 從 到 說 要 嗎 呢 吧 啊 之 其 等 於 個 一 二 三 四 五 六 七 八 九 十 上 下 中 大 小 多 少 好 來 去 人 又 還 才 只 想 看 做 讓 給 跟 向 由 如 若 則 並 且 所 已 曾 將 著 過 地 得 " +
+  "我們 你們 他們 她們 自己 因為 所以 但是 如果 可以 沒有 什麼 這個 那個 一個 已經 還是 或是 以及 以後 以前 因此 然而 不過 而且 雖然 可是 一些 這樣 那樣 這些 那些 怎麼 為什麼 時候 現在 今天 明天 昨天 知道 覺得 需要 應該 可能 不是 就是 也是 都是 一樣 一起 一定 非常 比較 每個").split(" "));
+
+const segmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("zh", { granularity: "word" }) : null;
+
+// Inside a chunk that is not a known word, still pick out your own multi-character words
+function classify(t) {
+  if (lex.has(t)) return [{ t, k: "known" }];
+  if (COMMON.has(t)) return [{ t, k: "common" }];
+  const res = [];
+  let rest = "", i = 0;
+  const flush = () => { if (rest) { res.push({ t: rest, k: COMMON.has(rest) ? "common" : "unk" }); rest = ""; } };
+  while (i < t.length) {
+    let hit = "";
+    for (let L = Math.min(lexMax, t.length - i); L >= 2; L--) {
+      const c = t.substr(i, L);
+      if (lex.has(c)) { hit = c; break; }
+    }
+    if (hit) { flush(); res.push({ t: hit, k: "known" }); i += hit.length; }
+    else { rest += t[i]; i++; }
+  }
+  flush();
+  return res;
+}
+
+function tokens(text) {
+  const pieces = segmenter
+    ? [...segmenter.segment(text)].map(x => x.segment)
+    : (text.match(/[\u4e00-\u9fff]+|[^\u4e00-\u9fff]+/g) || []);
+  const out = [];
+  pieces.forEach(t => {
+    if (!hasZh(t)) out.push({ t, k: "x" });
+    else out.push(...classify(t));
+  });
+  return out;
+}
+
+// Text with every word clickable; words that are NOT in your database get the color
+function annotate(text) {
+  return tokens(String(text ?? "")).map(x => x.k === "x" ? escHTML(x.t)
+    : `<span class="w ${lexOk ? x.k : "common"}" data-w="${escHTML(x.t)}">${escHTML(x.t)}</span>`).join("");
+}
+const annotateBold = text => String(text).split("**")
+  .map((seg, i) => i % 2 ? `<strong>${annotate(seg)}</strong>` : annotate(seg)).join("");
+const zhRowA = t => `<div class="item"><div class="row"><div class="zh">${annotate(t)}</div>${speakBtn(escHTML(t))}</div></div>`;
+const legendHTML = () => lexOk
+  ? `<p class="legend"><span class="lg-unk">橘色</span> ＝ 資料庫裡沒有的詞。點一下任何詞，可以看拼音和意思。</p>`
+  : `<p class="legend">點一下任何詞，可以看拼音和意思。</p>`;
+
+async function translateWord(w) {
+  const key = "lookup:" + w;
+  const cached = localStorage.getItem(key);
+  if (cached) return cached;
+  try {
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(w)}&langpair=zh-TW|en`);
+    const j = await r.json();
+    const t = (j.responseData && j.responseData.translatedText) || "";
+    if (!t || /MYMEMORY WARNING|INVALID|QUERY LENGTH/i.test(t)) return "";
+    localStorage.setItem(key, t);
+    return t;
+  } catch (err) { return ""; }
+}
+
+let lookupWord = "";
+function hideLookup() { lookupWord = ""; $("lookup").hidden = true; }
+
+async function showLookup(w) {
+  lookupWord = w;
+  const info = lex.get(w);
+  const py = (info && info.pinyin) || (typeof pinyinPro !== "undefined" ? pinyinPro.pinyin(w, { toneType: "symbol" }) : "");
+  const gt = `https://translate.google.com/?sl=zh-TW&tl=en&text=${encodeURIComponent(w)}&op=translate`;
+  const box = $("lookup");
+  box.hidden = false;
+  box.innerHTML = `
+    <button class="lk-x" data-lk-close="1" aria-label="關閉">×</button>
+    <div class="lk-row"><span class="lk-w">${escHTML(w)}</span>${speakBtn(escHTML(w))}</div>
+    <div class="lk-py">${escHTML(py)}</div>
+    <div class="lk-mean" id="lkMean">${info && info.meaning ? escHTML(info.meaning) : "查詢中…"}</div>
+    <div class="lk-foot">${info ? "<span class='lk-tag'>資料庫裡有</span>" : "<span class='lk-tag unk'>資料庫裡沒有</span>"}
+      <a href="${gt}" target="_blank" rel="noopener">在 Google 翻譯開啟</a></div>`;
+  if (info && info.meaning) return;
+  const m = await translateWord(w);
+  const el = $("lkMean");
+  if (lookupWord === w && el) el.textContent = m ? m + "（機器翻譯，僅供參考）" : "暫時查不到意思，可以用下面的連結查詢。";
+}
+
 /* ---------- Articles (readings you paste in yourself) ---------- */
 let articles = [];
 let curArticle = null;
@@ -1176,6 +1321,7 @@ async function openArticles() {
     const { data, error } = await sb.from("articles").select("*").order("study_order", { ascending: false });
     if (error) throw error;
     articles = data;
+    await loadLexicon();
   } catch (err) {
     $("abody").textContent = "無法載入文章：" + err.message;
     return;
@@ -1190,8 +1336,9 @@ function renderArticles() {
       <button class="btn ghost" data-aback="1">‹ 文章列表</button>
       <h2 style="margin-top:14px">${escHTML(curArticle.title)}</h2>
       <button class="btn ghost" data-say="${escHTML(plainText(paras.join("")))}">朗讀全文</button>
+      ${legendHTML()}
       <div style="margin-top:14px">${paras.map(p => `
-        <div class="item"><div class="row"><div class="zh article-p">${boldHTML(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
+        <div class="item"><div class="row"><div class="zh article-p">${annotateBold(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
     return;
   }
   if (!articles.length) {
