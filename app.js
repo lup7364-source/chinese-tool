@@ -1022,6 +1022,7 @@ $("pSaveBtn").onclick = async () => {
     return;
   }
   $("pStatus").textContent = "✅ 已儲存，編號 " + data;
+  lexPromise = null;
   if (!curPhrase) openPhrases();
   $("praw").value = "";
   $("pForm").innerHTML = "";
