@@ -287,3 +287,27 @@ body[data-screen="articles"] #stepbar, body[data-screen="articles"] #reader { di
 /* Admin: each screen only shows its own "add" form */
 body[data-screen="articles"] #addBox, body[data-screen="articles"] #phraseBox { display: none !important; }
 body:not([data-screen="articles"]) #articleBox { display: none !important; }
+
+/* ===== Click a word: card + colored unknown words ===== */
+.w { cursor: pointer; border-radius: 4px; }
+.w:hover { background: var(--tint); }
+.w.unk { color: #c2410c; background: rgba(251, 146, 60, 0.16); }
+.legend { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+.lg-unk { color: #c2410c; background: rgba(251, 146, 60, 0.16); border-radius: 4px; padding: 0 4px; }
+
+#lookup {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 100;
+  max-width: 696px; margin: 0 auto; padding: 16px 18px;
+  background: var(--ink); color: var(--white); border-radius: 22px;
+  box-shadow: 0 8px 28px rgba(24, 29, 42, 0.35);
+}
+.lk-row { display: flex; align-items: center; gap: 12px; }
+.lk-w { font-size: 34px; font-weight: 500; }
+#lookup .speak { background: var(--blue); }
+.lk-py { color: rgba(255, 255, 255, 0.75); font-size: 20px; margin: 2px 0 6px; }
+.lk-mean { font-size: 17px; min-height: 1.4em; }
+.lk-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; }
+.lk-foot a { color: var(--blue); }
+.lk-tag { background: var(--blue); color: var(--white); border-radius: 999px; padding: 2px 10px; }
+.lk-tag.unk { background: #c2410c; }
+.lk-x { position: absolute; top: 8px; right: 12px; background: none; border: 0; color: var(--white); font-size: 26px; padding: 0 6px; cursor: pointer; }
