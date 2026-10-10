@@ -260,6 +260,10 @@ document.addEventListener("click", e => {
   const ps = e.target.closest("[data-pstep]");
   if (ps) { pStep = Number(ps.dataset.pstep); renderPhrases(); return; }
 
+  const atab = e.target.closest("[data-atab]");
+  if (atab) { articleTab = atab.dataset.atab; renderArticles(); return; }
+  if (e.target.closest("[data-aread]")) { setArticleRead(true); return; }
+  if (e.target.closest("[data-aunread]")) { setArticleRead(false); return; }
   if (e.target.closest("[data-aedit]")) { startEditArticle(); return; }
   if (e.target.closest("[data-vadd]")) { addVocabRow(); return; }
   const art = e.target.closest("[data-article]");
@@ -1022,7 +1026,6 @@ $("pSaveBtn").onclick = async () => {
     return;
   }
   $("pStatus").textContent = "✅ 已儲存，編號 " + data;
-  lexPromise = null;
   if (!curPhrase) openPhrases();
   $("praw").value = "";
   $("pForm").innerHTML = "";
@@ -1373,6 +1376,8 @@ async function showLookup(w) {
 /* ---------- Articles (readings you paste in yourself) ---------- */
 let articles = [];
 let curArticle = null;
+let articleTab = "unread";   // which list is open: "unread" or "read"
+let articleNote = "";        // one-time message shown at the top of the list
 
 const plainText = t => String(t).replace(/\*\*/g, "");
 // **text** becomes bold; everything else is shown as plain, safe text
@@ -1404,17 +1409,56 @@ function renderArticles() {
       <button class="btn ghost edit-btn" data-aedit="1">編輯這篇文章</button>
       ${legendHTML()}
       <div style="margin-top:14px">${paras.map(p => `
-        <div class="item"><div class="row"><div class="zh article-p">${annotateBold(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>`;
+        <div class="item"><div class="row"><div class="zh article-p">${annotateBold(p)}</div>${speakBtn(escHTML(plainText(p)))}</div></div>`).join("")}</div>
+      <div class="read-end">
+        ${curArticle.read_at
+          ? `<p class="py">這篇文章已經標記為「已複習」。</p><button class="btn ghost" data-aunread="1">標記為未複習</button>`
+          : `<button class="btn primary big-read" data-aread="1">✓ 已複習</button>`}
+        <p class="py" id="aReadMsg"></p>
+      </div>`;
     return;
   }
   if (!articles.length) {
     $("abody").innerHTML = `<h2>文章</h2><p class="body">還沒有文章。請到頁面最下方的「管理」新增。</p>`;
     return;
   }
-  $("abody").innerHTML = `<h2>文章</h2>` + articles.map(a => `
+  const isRead = articleTab === "read";
+  const shown = articles.filter(a => (isRead ? a.read_at : !a.read_at));
+  if (isRead) shown.sort((x, y) => String(y.read_at).localeCompare(String(x.read_at)));   // newest reviewed first
+  const note = articleNote;
+  articleNote = "";
+  $("abody").innerHTML = `<h2>文章</h2>
+    <div class="subtabs">
+      <button class="subtab ${isRead ? "" : "active"}" data-atab="unread">未複習</button>
+      <button class="subtab ${isRead ? "active" : ""}" data-atab="read">已複習</button>
+    </div>
+    ${note ? `<p class="py">${escHTML(note)}</p>` : ""}` +
+    (shown.length ? shown.map(a => `
     <button class="plist" data-article="${escHTML(a.code)}">
       <span class="zh" style="font-size:18px">${escHTML(a.title)}</span><span class="py">${paragraphs(a.body).length} 段</span>
-    </button>`).join("");
+    </button>`).join("")
+      : `<p class="body">${isRead ? "還沒有已複習的文章。" : "沒有未複習的文章了。"}</p>`);
+}
+
+// Mark the open article as reviewed (or undo it); the list is saved in the database
+async function setArticleRead(read) {
+  const a = curArticle;
+  if (!a) return;
+  const btn = document.querySelector("[data-aread], [data-aunread]");
+  if (btn) btn.disabled = true;
+  const { error } = await sb.rpc(read ? "mark_article_read" : "mark_article_unread", { p_code: a.code });
+  if (error) {
+    if (btn) btn.disabled = false;
+    const msg = $("aReadMsg");
+    if (msg) msg.textContent = "❌ 無法儲存：" + error.message + "（如果是新功能，請先在 Supabase 執行 article-read.sql）";
+    return;
+  }
+  a.read_at = read ? new Date().toISOString() : null;   // a is the same object as in `articles`
+  articleNote = read ? `已把「${a.title}」移到「已複習」。` : `已把「${a.title}」放回「未複習」。`;
+  curArticle = null;
+  articleTab = "unread";
+  renderArticles();
+  window.scrollTo(0, 0);
 }
 
 // First line = title. If the title and the first paragraph arrived on the same line,
