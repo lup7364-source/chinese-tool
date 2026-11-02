@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="extra.css?v=20">
 </head>
 <body data-screen="home">
   <div id="app">
@@ -21,6 +22,8 @@
       <button class="bigchoice" data-go="vocab"><span class="zh">單字</span><small>Vocabulary</small></button>
       <button class="bigchoice alt" data-go="phrases"><span class="zh">成語</span><small>Phrases</small></button>
       <button class="bigchoice outline" data-go="articles"><span class="zh">文章</span><small>Articles</small></button>
+      <button class="bigchoice soft" data-go="exam"><span class="zh">考試</span><small>Exam</small></button>
+      <button class="bigchoice soft" data-go="dashboard"><span class="zh">儀表板</span><small>Dashboard</small></button>
     </section>
 
     <div id="modes">
@@ -33,6 +36,10 @@
     <main id="stage" class="card">載入中…</main>
 
     <main id="reader" class="card">載入中…</main>
+
+    <main id="dashboard" class="card">載入中…</main>
+
+    <main id="exam" class="card">載入中…</main>
 
     <section id="articles">
       <main id="abody" class="card">載入中…</main>
@@ -100,9 +107,10 @@
   <div id="lookup" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=19"></script>
+  <script src="config.js?v=20"></script>
   <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
+  <script src="extra.js?v=20"></script>
 </body>
 </html>
