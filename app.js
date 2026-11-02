@@ -3,14 +3,11 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let word = null;      // today's word
 let step = 0;         // current section
-let correctCount = 0;
-let parsed = null;
 let adminOpen = false;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/"/g, "&quot;");
 const hasZh = s => /[\u4e00-\u9fff]/.test(s);
-const isChoice = q => q.options && q.options.length > 0;
 
 const SPK = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
 const speakBtn = t => `<button class="speak" data-say="${esc(t)}" aria-label="發音">${SPK}</button>`;
@@ -27,15 +24,14 @@ function mapWord(w) {
     usage: w.usage || "",
     examples: w.examples.sort(bySort),
     expressions: w.expressions.sort(bySort),
-    text: { zh: w.text_zh, pinyin: w.text_pinyin, en: w.text_en },
-    questions: w.questions.sort(bySort)
+    text: { zh: w.text_zh, pinyin: w.text_pinyin, en: w.text_en }
   };
 }
 
 async function fetchWord(code) {
   const { data, error } = await sb
     .from("words")
-    .select("*, examples(*), expressions(*), questions(*)")
+    .select("*, examples(*), expressions(*)")
     .eq("code", code)
     .single();
   if (error) throw error;
@@ -115,6 +111,14 @@ const item = it => `
     ${it.en ? `<div>${it.en}</div>` : ""}
   </div>`;
 
+// Same as item, but every Chinese word can be clicked to see pinyin + meaning
+const itemA = it => `
+  <div class="item">
+    <div class="row"><div class="zh">${annotate(it.zh)}</div>${speakBtn(it.zh)}</div>
+    ${it.pinyin ? `<div class="py">${it.pinyin}</div>` : ""}
+    ${it.en ? `<div>${it.en}</div>` : ""}
+  </div>`;
+
 function textBody(t) {
   if (!t || !t.zh) return "";
   return `
@@ -123,29 +127,6 @@ function textBody(t) {
       <div class="py">${t.pinyin || ""}</div>
       <div>${t.en || ""}</div>
     </div>`;
-}
-
-function practiceBody(d) {
-  const qs = d.questions.map((q, qi) => isChoice(q)
-    ? `<div class="question" id="q${qi}">
-         <p><strong>${qi + 1}. ${q.question}</strong></p>
-         ${q.options.map((opt, oi) =>
-           `<button class="option" data-q="${qi}" data-o="${oi}">${opt}</button>`).join("")}
-         <p class="feedback" id="fb${qi}"></p>
-       </div>`
-    : `<div class="question">
-         <div class="row"><p><strong>${qi + 1}. ${q.question}</strong></p>${speakBtn(q.question)}</div>
-         ${q.question_en ? `<p class="py">${q.question_en}</p>` : ""}
-         <textarea rows="3" placeholder="寫下你的答案…"></textarea>
-       </div>`).join("");
-  return qs + (d.questions.some(isChoice) ? '<p id="score"></p>' : "");
-}
-
-function summaryQuestions(d) {
-  return d.questions.map((q, i) => isChoice(q)
-    ? `<p><strong>${i + 1}. ${q.question}</strong><br>答案：${q.answer}</p>`
-    : `<p><strong>${i + 1}. ${q.question}</strong><br><span class="py">${q.question_en || ""}</span></p>`
-  ).join("");
 }
 
 function summaryHTML(d) {
@@ -159,10 +140,9 @@ function summaryHTML(d) {
     </div>
     ${block("意思", `<p class="body">${d.meaning}</p>`)}
     ${block("用法", d.usage && `<p class="body">${d.usage}</p>`)}
-    ${block("例句", d.examples.map(item).join(""))}
+    ${block("例句", d.examples.length ? legendHTML() + d.examples.map(itemA).join("") : "")}
     ${block("常用表達", d.expressions.map(item).join(""))}
-    ${block("短文", textBody(d.text))}
-    ${block("練習題", summaryQuestions(d))}`;
+    ${block("短文", textBody(d.text))}`;
 }
 
 function stepsFor(d) {
@@ -171,7 +151,6 @@ function stepsFor(d) {
   if (d.examples.length) s.push({ id: "examples", title: "例句" });
   if (d.expressions.length) s.push({ id: "expressions", title: "常用表達" });
   if (d.text && d.text.zh) s.push({ id: "text", title: "短文" });
-  if (d.questions.length) s.push({ id: "practice", title: "練習題" });
   s.push({ id: "summary", title: "總結" });
   s.push({ id: "confirm", title: "確認" });
   return s;
@@ -189,10 +168,9 @@ function sectionHTML(id, d, title) {
         <div class="note"><small>意思</small><p>${d.meaning}</p></div>`;
     case "speak": return speakSection(title, d.character, d.pinyin, d.pronunciation, "單字");
     case "usage":       return `<h2>${title}</h2><p class="body">${d.usage}</p>`;
-    case "examples":    return `<h2>${title}</h2>${d.examples.map(item).join("")}`;
+    case "examples":    return `<h2>${title}</h2>${legendHTML()}${d.examples.map(itemA).join("")}`;
     case "expressions": return `<h2>${title}</h2>${d.expressions.map(item).join("")}`;
     case "text":        return `<h2>${title}</h2>${textBody(d.text)}`;
-    case "practice":    return `<h2>${title}</h2>${practiceBody(d)}`;
     case "confirm":     return `<h2>${title}</h2>${finishHTML()}`;
     default:            return summaryHTML(d);
   }
@@ -202,7 +180,6 @@ function sectionHTML(id, d, title) {
 function render() {
   const steps = stepsFor(word);
   step = Math.min(step, steps.length - 1);
-  correctCount = 0;
 
   $("tabs").innerHTML = steps.map((s, i) =>
     `<button class="tab ${i === step ? "active" : ""}" data-step="${i}">${s.title}</button>`).join("");
@@ -210,29 +187,9 @@ function render() {
 
   const last = step === steps.length - 1;
   $("prevStep").disabled = step === 0;
-  $("nextStep").hidden = last;   // on the summary the big check button takes over
+  $("nextStep").hidden = last;   // on the last step the big check button takes over
 
   window.scrollTo(0, 0);
-}
-
-function checkAnswer(btn) {
-  const qi = Number(btn.dataset.q);
-  const oi = Number(btn.dataset.o);
-  const q = word.questions[qi];
-  const box = $("q" + qi);
-  if (box.dataset.done) return;
-  box.dataset.done = "1";
-
-  const correct = q.options[oi] === q.answer;
-  btn.classList.add(correct ? "right" : "wrong");
-  if (!correct) {
-    box.querySelectorAll(".option").forEach(b => {
-      if (q.options[Number(b.dataset.o)] === q.answer) b.classList.add("right");
-    });
-  }
-  $("fb" + qi).textContent = (correct ? "答對了！ " : "再試試。 ") + (q.explanation || "");
-  if (correct) correctCount++;
-  $("score").textContent = `得分：${correctCount} / ${word.questions.filter(isChoice).length}`;
 }
 
 /* ---------- Events ---------- */
@@ -248,8 +205,6 @@ document.addEventListener("click", e => {
   if (e.target.closest("#pinBtn")) { submitPin(); return; }
   const say = e.target.closest("[data-say]");
   if (say) { speak(say.dataset.say); return; }
-  const opt = e.target.closest(".option");
-  if (opt) { checkAnswer(opt); return; }
   const tab = e.target.closest("[data-step]");
   if (tab) { step = Number(tab.dataset.step); render(); return; }
 
@@ -316,7 +271,7 @@ async function submitPin() {
     $("pinMsg").textContent =
       data.reason === "locked" ? `嘗試次數過多，請 ${data.minutes} 分鐘後再試。` :
       data.reason === "wrong_pin" ? `密碼錯誤，還可以再試 ${data.left} 次。` :
-      "尚未設定密碼，請先在 Supabase 執行 set-pin.sql。";
+      "尚未設定密碼，請先在 Supabase 設定 PIN。";
     return;
   }
   localStorage.removeItem("spoken");
@@ -481,7 +436,7 @@ function parseWord(raw) {
     usage: text("usage"),
     examples: pairLines(sec.examples || []).map(p => ({ zh: p.zh, pinyin: "", en: p.en })),
     expressions: (sec.expressions || []).filter(Boolean).map(parseExpression),
-    questions: pairLines(sec.questions || []).map(p => ({ question: p.zh, question_en: p.en }))
+    questions: []   // practice questions are no longer used
   };
   if (!w.character) throw new Error("缺少 Character（單字）區塊。");
   if (!w.pinyin) throw new Error("缺少 Pinyin（拼音）區塊。");
@@ -497,9 +452,7 @@ function previewHTML(w) {
     <p><strong>例句（${w.examples.length}）</strong></p>
     <ul>${w.examples.map(e => `<li>${e.zh} → ${e.en}</li>`).join("")}</ul>
     <p><strong>常用表達（${w.expressions.length}）</strong></p>
-    <ul>${w.expressions.map(e => `<li>${e.zh}${e.pinyin ? "（" + e.pinyin + "）" : ""} → ${e.en}</li>`).join("")}</ul>
-    <p><strong>練習題（${w.questions.length}）</strong></p>
-    <ul>${w.questions.map(q => `<li>${q.question} → ${q.question_en}</li>`).join("")}</ul>`;
+    <ul>${w.expressions.map(e => `<li>${e.zh}${e.pinyin ? "（" + e.pinyin + "）" : ""} → ${e.en}</li>`).join("")}</ul>`;
 }
 
 /* ---------- Admin (add words) ---------- */
@@ -1013,7 +966,7 @@ $("pSaveBtn").onclick = async () => {
   if (error) {
     $("pStatus").textContent =
       /duplicate key/i.test(error.message) ? "❌ 這個成語已經存在。" :
-      /not allowed/i.test(error.message) ? "❌ 沒有權限儲存：資料庫不認得這個登入帳號。請在 Supabase 執行 fix-phrases.sql。" :
+      /not allowed/i.test(error.message) ? "❌ 沒有權限儲存：請確認你已經登入。" :
       "❌ " + error.message;
     return;
   }
@@ -1450,7 +1403,7 @@ async function setArticleRead(read) {
   if (error) {
     if (btn) btn.disabled = false;
     const msg = $("aReadMsg");
-    if (msg) msg.textContent = "❌ 無法儲存：" + error.message + "（如果是新功能，請先在 Supabase 執行 article-read.sql）";
+    if (msg) msg.textContent = "❌ 無法儲存：" + error.message;
     return;
   }
   a.read_at = read ? new Date().toISOString() : null;   // a is the same object as in `articles`
@@ -1599,9 +1552,10 @@ $("dateLabel").textContent = new Date().toLocaleDateString("zh-TW", {
 });
 
 loadCurrent()
-  .then(w => {
+  .then(async w => {
     if (!w) { showDone(); return; }
     word = w;
+    await loadLexicon();   // so the examples can color words that are not in the database
     render();
   })
   .catch(err => {
