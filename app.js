@@ -87,8 +87,34 @@ function speakSection(title, hanzi, pinyin, say, kind) {
     </div>`;
 }
 
+// The browser needs an installed Chinese voice. We pick one explicitly (zh-TW first).
+let zhVoice = null;
+let voiceWarned = false;
+function pickVoice() {
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  zhVoice =
+    vs.find(v => /(zh|cmn)[-_]?(TW|Hant)/i.test(v.lang)) ||
+    vs.find(v => /(zh|cmn)[-_]?HK/i.test(v.lang)) ||
+    vs.find(v => /^(zh|cmn)/i.test(v.lang)) || null;
+}
+if ("speechSynthesis" in window) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;   // voices often load a moment after the page
+}
+
 function speak(text) {
+  if (!("speechSynthesis" in window)) { alert("這個瀏覽器不支援語音朗讀。"); return; }
+  // The microphone and the speaker cannot work at the same time on many phones
+  try { if (typeof appRec !== "undefined" && appRec) appRec.abort(); } catch (e) { /* ignore */ }
+
   speechSynthesis.cancel();
+  if (!zhVoice) pickVoice();
+  if (!zhVoice && !voiceWarned && speechSynthesis.getVoices().length) {
+    voiceWarned = true;
+    alert("這個裝置好像沒有安裝中文語音，所以可能聽不到聲音。\n請到手機或電腦的「設定 > 語音 / 文字轉語音」安裝中文（台灣）語音。");
+  }
+
   const sentences = String(text).match(/[^。！？\n]+[。！？]?/g) || [String(text)];
   const parts = [];
   let buf = "";
@@ -96,11 +122,18 @@ function speak(text) {
     if (buf && (buf + sn).length > 100) { parts.push(buf); buf = sn; } else buf += sn;
   });
   if (buf) parts.push(buf);
-  parts.forEach(part => {
-    const voice = new SpeechSynthesisUtterance(part);
-    voice.lang = "zh-TW";
-    speechSynthesis.speak(voice);
-  });
+
+  // Chrome can stay silent if speak() is called right after cancel(), so wait a moment
+  setTimeout(() => {
+    speechSynthesis.resume();
+    parts.forEach(part => {
+      const u = new SpeechSynthesisUtterance(part);
+      u.lang = zhVoice ? zhVoice.lang : "zh-TW";
+      if (zhVoice) u.voice = zhVoice;
+      u.rate = 0.9;
+      speechSynthesis.speak(u);
+    });
+  }, 80);
 }
 
 /* ---------- Section builders ---------- */
@@ -327,6 +360,9 @@ function isMatch(alts, target) {
   });
 }
 
+// "聽到：A / B / C" with the (up to 3) different things the recognizer thought it heard
+const heardText = alts => "聽到：" + [...new Set(alts.map(a => String(a).trim()).filter(Boolean))].slice(0, 3).join(" / ");
+
 function setMic(state, msg, heard) {
   const b = $("micBtn");
   if (!b) return;   // the user left this section
@@ -366,13 +402,14 @@ function startListening() {
     const alts = Array.from(e.results[0]).map(r => r.transcript);
     if (isMatch(alts, t.text)) {
       localStorage.setItem("spoken", t.code);
-      setMic("ok", "答對了！發音正確。", "聽到：" + alts[0]);
+      setMic("ok", "答對了！發音正確。", heardText(alts));
     } else {
-      setMic("bad", "再試一次", "聽到：" + alts[0]);
+      setMic("bad", "再試一次", heardText(alts));
     }
   };
   rec.onerror = e => {
     gotResult = true;
+    if (e.error === "aborted") return;
     setMic("bad",
       e.error === "not-allowed" || e.error === "service-not-allowed" ? "請允許使用麥克風，然後再試一次。" :
       e.error === "no-speech" ? "沒有聽到聲音，再試一次。" :

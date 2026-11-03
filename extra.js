@@ -207,16 +207,18 @@
       <div class="finish">
         <button id="exMic" class="mic" aria-label="麥克風">${MIC}</button>
         <p id="exMsg">按下麥克風，唸出這個字</p>
+        <p id="exHeard" class="py"></p>
       </div>
       <div class="finish"><button class="btn primary" data-ex-next="1">${last ? "完成考試" : "下一題"}</button></div>`;
     $("exInput").focus();
   }
 
-  function setExMic(state, msg) {
+  function setExMic(state, msg, heard) {
     const b = $("exMic");
     if (!b) return;
     b.className = "mic " + state;
     $("exMsg").textContent = msg;
+    if (heard !== undefined) $("exHeard").textContent = heard;
   }
 
   function exListen() {
@@ -237,14 +239,14 @@
     rec.maxAlternatives = 5;
     let got = false;
     exListening = true;
-    setExMic("listening", "請說話…（說完再按一次麥克風結束）");
+    setExMic("listening", "請說話…（說完再按一次麥克風結束）", "");
 
     rec.onresult = e => {
       got = true;
       if (!ex || ex.i !== myIndex) return;
       const alts = Array.from(e.results[0]).map(r => r.transcript);
-      if (isMatch(alts, q.hanzi)) { ex.spoke = true; setExMic("ok", "發音通過"); }
-      else setExMic("bad", "再試一次");
+      if (isMatch(alts, q.hanzi)) { ex.spoke = true; setExMic("ok", "發音通過", heardText(alts)); }
+      else setExMic("bad", "再試一次", heardText(alts));
     };
     rec.onerror = e => {
       got = true;
