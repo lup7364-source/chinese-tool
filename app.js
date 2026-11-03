@@ -335,8 +335,14 @@ function setMic(state, msg, heard) {
   if (heard !== undefined) $("heard").textContent = heard;
 }
 
+let appRec = null;   // the recognition that is running right now
+
 function startListening() {
-  if (listening) return;
+  // Second click while listening: stop and evaluate what was heard
+  if (listening) {
+    try { if (appRec) appRec.stop(); } catch (e) { /* already stopped */ }
+    return;
+  }
   const t = currentTarget();
   if (!t) return;
   if (!SR) {
@@ -350,9 +356,10 @@ function startListening() {
   rec.maxAlternatives = 5;
 
   let gotResult = false;
+  appRec = rec;
   listening = true;
   speechSynthesis.cancel();
-  setMic("listening", "請說話…", "");
+  setMic("listening", "請說話…（說完再按一次麥克風結束）", "");
 
   rec.onresult = e => {
     gotResult = true;
@@ -373,11 +380,12 @@ function startListening() {
   };
   rec.onend = () => {
     listening = false;
+    appRec = null;
     if (!gotResult) setMic("bad", "沒有聽到聲音，再試一次。");
   };
 
   try { rec.start(); }
-  catch (err) { listening = false; setMic("bad", "無法啟動麥克風，再試一次。"); }
+  catch (err) { listening = false; appRec = null; setMic("bad", "無法啟動麥克風，再試一次。"); }
 }
 $("prevStep").onclick = () => { if (step > 0) { step--; render(); } };
 

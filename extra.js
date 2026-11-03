@@ -220,7 +220,12 @@
   }
 
   function exListen() {
-    if (exListening || !ex) return;
+    if (!ex) return;
+    // Second click while listening: stop and evaluate what was heard
+    if (exListening) {
+      try { if (exRec) exRec.stop(); } catch (e) { /* already stopped */ }
+      return;
+    }
     if (!SR) { setExMic("bad", "這個瀏覽器不支援語音辨識。請改用 Chrome（Android）或 Safari（iPhone）。"); return; }
     const q = ex.items[ex.i];
     const myIndex = ex.i;
@@ -232,7 +237,7 @@
     rec.maxAlternatives = 5;
     let got = false;
     exListening = true;
-    setExMic("listening", "請說話…");
+    setExMic("listening", "請說話…（說完再按一次麥克風結束）");
 
     rec.onresult = e => {
       got = true;
@@ -243,6 +248,7 @@
     };
     rec.onerror = e => {
       got = true;
+      if (!ex || ex.i !== myIndex || e.error === "aborted") return;
       setExMic("bad",
         e.error === "not-allowed" || e.error === "service-not-allowed" ? "請允許使用麥克風，然後再試一次。" :
         e.error === "no-speech" ? "沒有聽到聲音，再試一次。" :
@@ -250,7 +256,7 @@
     };
     rec.onend = () => {
       exListening = false;
-      if (!got) setExMic("bad", "沒有聽到聲音，再試一次。");
+      if (!got && ex && ex.i === myIndex) setExMic("bad", "沒有聽到聲音，再試一次。");
     };
     try { rec.start(); }
     catch (err) { exListening = false; setExMic("bad", "無法啟動麥克風，再試一次。"); }
